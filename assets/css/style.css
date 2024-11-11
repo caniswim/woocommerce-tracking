@@ -1,0 +1,149 @@
+/* Container da página de rastreamento */
+.wcte-tracking-form-container {
+    max-width: 600px;
+    margin: 40px auto;
+    padding: 20px;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    background-color: #f9f9f9;
+    font-family: 'Helvetica Neue', sans-serif;
+}
+
+.wcte-tracking-form-container h2 {
+    font-size: 24px;
+    text-align: center;
+    color: #333;
+    margin-bottom: 20px;
+}
+
+.wcte-tracking-form-container label {
+    font-size: 16px;
+    color: #666;
+    display: block;
+    margin-bottom: 10px;
+    font-weight: 500;
+}
+
+.wcte-tracking-form-container input[type="text"] {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    box-sizing: border-box;
+    max-width: 400px;
+}
+
+.track-button {
+    display: inline-block;
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    background-color: #333;
+    color: #fff;
+    text-align: center;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.track-button:hover {
+    background-color: #555;
+}
+
+.tracking-results,
+#wcte-tracking-results {
+    margin-top: 30px;
+}
+
+.tracking-info-container {
+    padding: 15px;
+    background-color: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+}
+
+.tracking-info {
+    padding: 10px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.tracking-info:last-child {
+    border-bottom: none;
+}
+
+.tracking-status {
+    font-size: 18px;
+    font-weight: bold;
+    color: #333;
+}
+
+.tracking-message {
+    font-size: 16px;
+    color: #555;
+    margin-top: 5px;
+}
+
+.error {
+    color: #b00020;
+    font-weight: bold;
+    text-align: center;
+}
+
+/* Formulário de itens faltantes */
+#wcte-missing-item-form {
+    margin-top: 30px;
+}
+
+#wcte-missing-item-form h3 {
+    margin-bottom: 15px;
+}
+
+#wcte-missing-item-form ul {
+    list-style: none;
+    padding: 0;
+}
+
+#wcte-missing-item-form li {
+    margin-bottom: 10px;
+}
+
+#wcte-missing-item-form button {
+    padding: 10px 20px;
+}
+
+/* Código de Rastreamento */
+.tracking-number {
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 10px;
+}
+
+/* Histórico de Rastreamento */
+.tracking-history {
+    list-style: none;
+    padding: 0;
+    margin-top: 15px;
+}
+
+.tracking-history li {
+    padding: 8px 0;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.tracking-history li:last-child {
+    border-bottom: none;
+}
+
+.event-date {
+    font-weight: bold;
+    color: #333;
+}
+
+.event-description {
+    color: #555;
+}
