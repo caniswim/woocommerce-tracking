@@ -29,7 +29,7 @@ class WCTE_Admin_Settings {
             'Mensagens Fictícias',
             'Mensagens Fictícias',
             'manage_options',
-            'wcte_fictitious_settings',
+            'wcte_fictitious',
             array( $this, 'render_fictitious_page' )
         );
 
@@ -48,8 +48,6 @@ class WCTE_Admin_Settings {
         register_setting( 'wcte_correios_settings', 'wcte_correios_cartao_postagem' );
         register_setting( 'wcte_correios_settings', 'wcte_correios_contrato' );
         register_setting( 'wcte_correios_settings', 'wcte_correios_token' );
-
-        // Registra as configurações do Slack
         register_setting( 'wcte_correios_settings', 'wcte_slack_webhook_url' );
 
         // Registra as configurações de mensagens fictícias
