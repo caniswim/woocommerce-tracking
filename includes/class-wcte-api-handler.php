@@ -48,9 +48,15 @@ class WCTE_API_Handler {
             }
         }
 
-        $username = '48004893000170';
-        $codigo_acesso = 'YhDliJoedrwYENVkifjRDgju4xbZsujsLLrcfB03';
-        $cartao_postagem = '0078691788';
+        $username = get_option('wcte_correios_username');
+        $codigo_acesso = get_option('wcte_correios_api_key');
+        $cartao_postagem = get_option('wcte_correios_cartao_postagem');
+
+        if (empty($username) || empty($codigo_acesso) || empty($cartao_postagem)) {
+            self::log('Credenciais dos Correios não configuradas');
+            return null;
+        }
+
         $auth_header = 'Basic ' . base64_encode($username . ':' . $codigo_acesso);
 
         $body = array('numero' => $cartao_postagem);
