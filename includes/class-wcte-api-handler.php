@@ -31,7 +31,25 @@ class WCTE_API_Handler {
         if (preg_match('/^(LP|CN)/i', $tracking_code)) {
             return self::get_cainiao_tracking_info($tracking_code);
         } else {
-            return self::get_correios_tracking_info($tracking_code);
+            $tracking_info = self::get_correios_tracking_info($tracking_code);
+            
+            // If we have real tracking data, merge with fake updates
+            if ($tracking_info['status'] !== 'error' && isset($tracking_info['data'])) {
+                $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
+                if (!empty($fake_updates)) {
+                    $formatted_fake_updates = WCTE_Database::format_fake_updates($fake_updates);
+                    
+                    // Merge and sort all updates by date
+                    $all_updates = array_merge($tracking_info['data'], $formatted_fake_updates);
+                    usort($all_updates, function($a, $b) {
+                        return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
+                    });
+                    
+                    $tracking_info['data'] = $all_updates;
+                }
+            }
+            
+            return $tracking_info;
         }
     }
 
@@ -142,10 +160,29 @@ class WCTE_API_Handler {
         $data = json_decode($body, true);
 
         if ($status_code !== 200 || empty($data['objetos']) || empty($data['objetos'][0]['eventos'])) {
+            // Get fake updates from Firebase
+            $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
+            if (!empty($fake_updates)) {
+                $formatted_updates = WCTE_Database::format_fake_updates($fake_updates);
+                return array(
+                    'status' => 'in_transit',
+                    'message' => end($formatted_updates)['description'],
+                    'data' => $formatted_updates
+                );
+            }
+
+            // If no fake updates yet, generate and save one
             $fictitious_message = self::get_fictitious_message($tracking_code);
-            return array(
-                'status' => 'fictitious',
+            $update_data = array(
                 'message' => $fictitious_message,
+                'timestamp' => time()
+            );
+            WCTE_Database::save_fake_update($tracking_code, $update_data);
+
+            return array(
+                'status' => 'in_transit',
+                'message' => $fictitious_message,
+                'data' => WCTE_Database::format_fake_updates(array($update_data))
             );
         }
 
@@ -175,7 +212,8 @@ class WCTE_API_Handler {
             $filtered_events[] = array(
                 'date' => date('d/m/Y H:i', strtotime($event['dtHrCriado'])),
                 'description' => $event['descricao'],
-                'location' => $location
+                'location' => $location,
+                'is_fake' => false
             );
         }
 
@@ -198,7 +236,7 @@ class WCTE_API_Handler {
      */
     private static function get_fictitious_message($tracking_code) {
         $messages = get_option('wcte_fictitious_messages', array());
-        $creation_date = self::get_tracking_creation_date($tracking_code);
+        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
 
         if (!$creation_date) {
             return 'Seu pedido está em processamento.';
@@ -220,27 +258,6 @@ class WCTE_API_Handler {
         }
 
         return $current_message;
-    }
-
-   /**
-     * Obtém a data de criação do código de rastreamento, se a tabela existir
-     */
-    private static function get_tracking_creation_date($tracking_code) {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'wcte_order_tracking';
-
-        // Verifica se a tabela existe antes de tentar acessar
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
-            error_log('WCTE - Tabela wp_wcte_order_tracking não existe.');
-            return null;
-        }
-
-        $result = $wpdb->get_row($wpdb->prepare(
-            "SELECT created_at FROM $table_name WHERE tracking_code = %s",
-            $tracking_code
-        ));
-
-        return $result ? $result->created_at : null;
     }
 
     /**
