@@ -26,7 +26,7 @@ class WCTE_Admin_Settings {
         // Submenu para mensagens fictícias
         add_submenu_page(
             'wcte_settings',
-            'Mensagens Fictícias',
+            // 'Mensagens Fictícias',
             'Mensagens Fictícias',
             'manage_options',
             'wcte_fictitious',
