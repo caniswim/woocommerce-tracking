@@ -50,6 +50,11 @@ class WCTE_Admin_Settings {
         register_setting( 'wcte_correios_settings', 'wcte_correios_token' );
         register_setting( 'wcte_correios_settings', 'wcte_slack_webhook_url' );
 
+        // Registra as configurações do Firebase
+        register_setting( 'wcte_correios_settings', 'wcte_firebase_api_key' );
+        register_setting( 'wcte_correios_settings', 'wcte_firebase_database_url' );
+        register_setting( 'wcte_correios_settings', 'wcte_firebase_project_id' );
+
         // Registra as configurações de mensagens fictícias
         register_setting( 'wcte_fictitious_settings', 'wcte_fictitious_messages', array(
             'sanitize_callback' => array($this, 'sanitize_fictitious_messages')
@@ -59,6 +64,14 @@ class WCTE_Admin_Settings {
         add_settings_section(
             'wcte_correios_section',
             'Configurações dos Correios',
+            null,
+            'wcte_correios_settings'
+        );
+
+        // Seção do Firebase
+        add_settings_section(
+            'wcte_firebase_section',
+            'Configurações do Firebase',
             null,
             'wcte_correios_settings'
         );
@@ -120,6 +133,31 @@ class WCTE_Admin_Settings {
             'wcte_correios_section'
         );
 
+        // Campos do Firebase
+        add_settings_field(
+            'wcte_firebase_api_key',
+            'API Key do Firebase',
+            array( $this, 'firebase_api_key_field_callback' ),
+            'wcte_correios_settings',
+            'wcte_firebase_section'
+        );
+
+        add_settings_field(
+            'wcte_firebase_database_url',
+            'URL do Realtime Database',
+            array( $this, 'firebase_database_url_field_callback' ),
+            'wcte_correios_settings',
+            'wcte_firebase_section'
+        );
+
+        add_settings_field(
+            'wcte_firebase_project_id',
+            'ID do Projeto',
+            array( $this, 'firebase_project_id_field_callback' ),
+            'wcte_correios_settings',
+            'wcte_firebase_section'
+        );
+
         // Campo do Slack
         add_settings_field(
             'wcte_slack_webhook_url',
@@ -148,6 +186,7 @@ class WCTE_Admin_Settings {
         return $sanitized;
     }
 
+    // Callbacks dos campos dos Correios
     public function api_key_field_callback() {
         $api_key = get_option( 'wcte_correios_api_key' );
         echo '<input type="text" name="wcte_correios_api_key" value="' . esc_attr( $api_key ) . '" class="regular-text" />';
@@ -178,6 +217,26 @@ class WCTE_Admin_Settings {
         echo '<input type="text" name="wcte_correios_token" value="' . esc_attr( $token ) . '" class="regular-text" />';
     }
 
+    // Callbacks dos campos do Firebase
+    public function firebase_api_key_field_callback() {
+        $api_key = get_option( 'wcte_firebase_api_key' );
+        echo '<input type="text" name="wcte_firebase_api_key" value="' . esc_attr( $api_key ) . '" class="regular-text" />';
+        echo '<p class="description">A chave da API do seu projeto Firebase</p>';
+    }
+
+    public function firebase_database_url_field_callback() {
+        $database_url = get_option( 'wcte_firebase_database_url' );
+        echo '<input type="text" name="wcte_firebase_database_url" value="' . esc_attr( $database_url ) . '" class="regular-text" />';
+        echo '<p class="description">URL do seu Realtime Database (ex: https://seu-projeto.firebaseio.com)</p>';
+    }
+
+    public function firebase_project_id_field_callback() {
+        $project_id = get_option( 'wcte_firebase_project_id' );
+        echo '<input type="text" name="wcte_firebase_project_id" value="' . esc_attr( $project_id ) . '" class="regular-text" />';
+        echo '<p class="description">O ID do seu projeto Firebase</p>';
+    }
+
+    // Callback do campo do Slack
     public function slack_webhook_field_callback() {
         $webhook_url = get_option( 'wcte_slack_webhook_url' );
         echo '<input type="text" name="wcte_slack_webhook_url" value="' . esc_attr( $webhook_url ) . '" class="regular-text" />';

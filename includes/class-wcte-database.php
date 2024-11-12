@@ -14,13 +14,6 @@ class WCTE_Database {
             'databaseURL' => get_option('wcte_firebase_database_url'),
             'projectId' => get_option('wcte_firebase_project_id')
         );
-
-        // Add Firebase settings to WordPress options if they don't exist
-        if (!get_option('wcte_firebase_api_key')) {
-            add_option('wcte_firebase_api_key', '');
-            add_option('wcte_firebase_database_url', '');
-            add_option('wcte_firebase_project_id', '');
-        }
     }
 
     public static function install() {
@@ -196,8 +189,7 @@ class WCTE_Database {
             $formatted_updates[] = array(
                 'date' => date('d/m/Y H:i', $update['timestamp']),
                 'description' => $update['message'],
-                'location' => 'Sistema',
-                'is_fake' => true
+                'location' => 'Brasil'
             );
         }
         return $formatted_updates;

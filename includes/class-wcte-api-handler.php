@@ -212,8 +212,7 @@ class WCTE_API_Handler {
             $filtered_events[] = array(
                 'date' => date('d/m/Y H:i', strtotime($event['dtHrCriado'])),
                 'description' => $event['descricao'],
-                'location' => $location,
-                'is_fake' => false
+                'location' => $location
             );
         }
 
