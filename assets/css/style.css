@@ -6,6 +6,100 @@
     color: #333;
 }
 
+/* Multiple Tracking Warning */
+.wcte-multiple-tracking-warning {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f8f8;
+    border-radius: 8px;
+    border: 1px solid #e8e8e8;
+}
+
+.wcte-multiple-tracking-warning h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #000;
+}
+
+/* Cainiao Tracking */
+.wcte-cainiao-tracking {
+    margin: 20px 0;
+    padding: 15px;
+    background: #f8f8f8;
+    border-radius: 8px;
+    border: 1px solid #e8e8e8;
+}
+
+.wcte-tracking-message {
+    margin-bottom: 15px;
+    color: #333;
+    font-size: 14px;
+}
+
+.wcte-tracking-button {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #000;
+    color: #fff !important;
+    text-decoration: none !important;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: background-color 0.3s ease;
+    border: none;
+    cursor: pointer;
+}
+
+.wcte-tracking-button:hover {
+    background-color: #333;
+    color: #fff !important;
+}
+
+/* Order Information Styles */
+.wcte-order-info {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: #f8f8f8;
+    border-radius: 8px;
+    border: 1px solid #e8e8e8;
+}
+
+.wcte-order-info h3 {
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    color: #000;
+}
+
+.wcte-order-items {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+}
+
+.wcte-order-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 4px;
+    width: calc(50% - 7.5px);
+}
+
+.wcte-order-item img {
+    width: 50px;
+    height: 50px;
+    object-fit: cover;
+    border-radius: 4px;
+}
+
+.wcte-item-name {
+    font-size: 14px;
+    color: #333;
+    flex: 1;
+}
+
+/* Tracking Form Styles */
 .wcte-tracking-form {
     margin-bottom: 30px;
 }
@@ -30,13 +124,14 @@
 
 .tracking-submit-button {
     padding: 8px 20px;
-    background-color: #ff4747;
+    background-color: #000;
     color: white;
     border: none;
     border-radius: 4px;
     cursor: pointer;
 }
 
+/* Tracking Information Styles */
 .wcte-carrier-info {
     margin-bottom: 20px;
 }
@@ -44,6 +139,7 @@
 .wcte-carrier-info h3 {
     font-size: 18px;
     margin: 0 0 10px 0;
+    color: #000;
 }
 
 .wcte-tracking-number {
@@ -56,12 +152,14 @@
 .wcte-copy-button {
     background: none;
     border: none;
-    color: #1890ff;
+    color: #000;
     cursor: pointer;
     padding: 0;
     font-size: 14px;
+    text-decoration: underline;
 }
 
+/* Timeline Styles */
 .wcte-timeline {
     position: relative;
     padding-left: 20px;
@@ -96,8 +194,8 @@
 }
 
 .wcte-timeline-dot.active {
-    background: #1890ff;
-    box-shadow: 0 0 0 1px #1890ff;
+    background: #000;
+    box-shadow: 0 0 0 1px #000;
 }
 
 .wcte-timeline-content {
@@ -112,7 +210,7 @@
 
 .wcte-event-details {
     font-size: 12px;
-    color: #999;
+    color: #666;
 }
 
 .wcte-event-location {
@@ -131,7 +229,7 @@
 .wcte-show-more-button {
     background: none;
     border: 1px solid #e8e8e8;
-    color: #666;
+    color: #000;
     padding: 6px 15px;
     border-radius: 15px;
     cursor: pointer;
@@ -144,11 +242,60 @@
     background: #f5f5f5;
 }
 
-.error {
-    color: #ff4747;
+/* Other Orders Styles */
+.wcte-other-orders {
+    margin-top: 30px;
+    padding: 20px;
+    background: #f8f8f8;
+    border-radius: 8px;
+    border: 1px solid #e8e8e8;
+}
+
+.wcte-other-orders h3 {
+    margin: 0 0 15px 0;
+    font-size: 18px;
+    color: #000;
+}
+
+.wcte-orders-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.wcte-other-order-item {
+    display: flex;
+    justify-content: space-between;
     padding: 10px;
-    border: 1px solid #ffe4e4;
-    background-color: #fff2f2;
+    background: #fff;
+    border: 1px solid #e8e8e8;
+    border-radius: 4px;
+}
+
+.wcte-order-number {
+    font-weight: 500;
+    color: #000;
+}
+
+.wcte-order-date {
+    color: #666;
+}
+
+.error {
+    color: #000;
+    padding: 10px;
+    border: 1px solid #e8e8e8;
+    background-color: #f8f8f8;
     border-radius: 4px;
     margin: 10px 0;
+}
+
+@media (max-width: 600px) {
+    .wcte-order-item {
+        width: 100%;
+    }
+    
+    .wcte-tracking-number {
+        flex-wrap: wrap;
+    }
 }

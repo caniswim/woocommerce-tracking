@@ -45,7 +45,50 @@ jQuery(document).ready(function($) {
     function renderTrackingResults(data) {
         var htmlContent = '<div class="wcte-tracking-container">';
 
-        data.tracking_results.forEach(function(result) {
+        // Order Information Section
+        if (data.order_number) {
+            htmlContent += '<div class="wcte-order-info">';
+            htmlContent += '<h3>Pedido #' + data.order_number + '</h3>';
+            
+            // Order Items
+            if (data.order_items && data.order_items.length > 0) {
+                htmlContent += '<div class="wcte-order-items">';
+                data.order_items.forEach(function(item) {
+                    htmlContent += '<div class="wcte-order-item">';
+                    if (item.image) {
+                        htmlContent += '<img src="' + item.image + '" alt="' + item.name + '" />';
+                    }
+                    htmlContent += '<span class="wcte-item-name">' + item.name + '</span>';
+                    htmlContent += '</div>';
+                });
+                htmlContent += '</div>';
+            }
+            htmlContent += '</div>';
+        }
+
+        // Multiple Tracking Warning
+        if (data.tracking_results.length > 1) {
+            htmlContent += '<div class="wcte-multiple-tracking-warning">';
+            htmlContent += '<h3>Encontramos múltiplos envios para o seu pedido:</h3>';
+            htmlContent += '</div>';
+        }
+
+        // Sort tracking results
+        const sortedResults = [...data.tracking_results].sort((a, b) => {
+            // Helper function to get priority (0: active, 1: cainiao, 2: delivered)
+            const getPriority = (result) => {
+                if (result.status === 'cainiao') return 1;
+                return isDeliveredStatus(result) ? 2 : 0;
+            };
+
+            const priorityA = getPriority(a);
+            const priorityB = getPriority(b);
+
+            return priorityA - priorityB;
+        });
+
+        // Tracking Information Section
+        sortedResults.forEach(function(result) {
             htmlContent += '<div class="wcte-tracking-info">';
             
             // Carrier info and tracking number
@@ -54,22 +97,29 @@ jQuery(document).ready(function($) {
             htmlContent += '<div class="wcte-tracking-number">';
             htmlContent += '<span>Número de rastreamento: </span>';
             htmlContent += '<strong>' + result.tracking_code + '</strong>';
-            htmlContent += '<button class="wcte-copy-button" data-tracking="' + result.tracking_code + '">Copiar</button>';
             htmlContent += '</div>';
             htmlContent += '</div>';
 
-            if (result.data && result.data.length > 0) {
+            if (result.status === 'cainiao') {
+                htmlContent += '<div class="wcte-cainiao-tracking">';
+                htmlContent += '<p class="wcte-tracking-message">' + result.message + '</p>';
+                htmlContent += '<a href="' + result.tracking_url + '" target="_blank" class="wcte-tracking-button">Rastrear no Site da Transportadora</a>';
+                htmlContent += '</div>';
+            } else if (result.data && result.data.length > 0) {
                 htmlContent += '<div class="wcte-timeline">';
                 
-                // Show first 3 events initially
-                result.data.slice(0, 3).forEach(function(event, index) {
+                // Reverse the data array to show newest events first
+                const reversedData = [...result.data].reverse();
+                
+                // Show first 3 events initially (now the most recent ones)
+                reversedData.slice(0, 3).forEach(function(event, index) {
                     htmlContent += renderTimelineEvent(event, index === 0);
                 });
 
                 // Add hidden events
-                if (result.data.length > 3) {
+                if (reversedData.length > 3) {
                     htmlContent += '<div class="wcte-hidden-events" style="display: none;">';
-                    result.data.slice(3).forEach(function(event) {
+                    reversedData.slice(3).forEach(function(event) {
                         htmlContent += renderTimelineEvent(event, false);
                     });
                     htmlContent += '</div>';
@@ -83,17 +133,24 @@ jQuery(document).ready(function($) {
             htmlContent += '</div>'; // .wcte-tracking-info
         });
 
+        // Other Orders Section
+        if (data.other_orders && data.other_orders.length > 0) {
+            htmlContent += '<div class="wcte-other-orders">';
+            htmlContent += '<h3>Outros Pedidos</h3>';
+            htmlContent += '<div class="wcte-orders-list">';
+            data.other_orders.forEach(function(order) {
+                htmlContent += '<div class="wcte-other-order-item">';
+                htmlContent += '<span class="wcte-order-number">Pedido #' + order.order_number + '</span>';
+                htmlContent += '<span class="wcte-order-date">' + order.date + '</span>';
+                htmlContent += '</div>';
+            });
+            htmlContent += '</div>';
+            htmlContent += '</div>';
+        }
+
         htmlContent += '</div>'; // .wcte-tracking-container
 
         $('#wcte-tracking-results').html(htmlContent);
-
-        // Event handlers
-        $('.wcte-copy-button').on('click', function() {
-            var trackingNumber = $(this).data('tracking');
-            navigator.clipboard.writeText(trackingNumber).then(function() {
-                alert('Código copiado!');
-            });
-        });
 
         $('.wcte-show-more-button').on('click', function() {
             var $button = $(this);
@@ -107,6 +164,22 @@ jQuery(document).ready(function($) {
                 $button.text('Ver menos');
             }
         });
+    }
+
+    function isDeliveredStatus(result) {
+        // Skip Cainiao tracking
+        if (result.status === 'cainiao') {
+            return false;
+        }
+
+        // For regular tracking
+        if (result.status === 'delivered') return true;
+        if (result.data && result.data.length > 0) {
+            const lastEvent = result.data[0];
+            return lastEvent.description.toLowerCase().includes('entregue') ||
+                   lastEvent.description.toLowerCase().includes('delivered');
+        }
+        return false;
     }
 
     function renderTimelineEvent(event, isActive) {
