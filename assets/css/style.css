@@ -1,293 +1,154 @@
-/* Container de Informações de Rastreamento */
-.tracking-info-container {
+.wcte-tracking-container {
+    max-width: 800px;
+    margin: 0 auto;
     padding: 20px;
-    background-color: #fff;
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    margin-bottom: 20px;
-    font-family: Arial, sans-serif;
-}
-
-/* Informação do Código de Rastreamento */
-.tracking-info {
-    padding: 10px 0;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.tracking-info:last-child {
-    border-bottom: none;
-}
-
-.tracking-number {
-    font-size: 16px;
-    color: #333;
-    margin-bottom: 10px;
-}
-
-.tracking-status {
-    font-size: 18px;
-    font-weight: bold;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen-Sans, Ubuntu, Cantarell, 'Helvetica Neue', sans-serif;
     color: #333;
 }
 
-.tracking-message {
-    font-size: 16px;
-    color: #555;
-    margin-top: 5px;
-}
-
-/* Histórico de Rastreamento Expansível */
-.tracking-history-container {
-    margin-top: 15px;
-}
-
-.toggle-history {
-    background-color: #333;
-    color: #fff;
-    padding: 10px;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-    width: 100%;
-    text-align: left;
-    font-size: 16px;
-}
-
-.toggle-history:hover {
-    background-color: #555;
-}
-
-
-@media (max-width: 768px) {
-	.toggle-history {
-		text-align:center;
-	}
-}
-
-.tracking-history {
-    list-style: none;
-    padding: 0;
-    margin-top: 15px;
-    display: none;
-}
-
-.tracking-history li {
-    padding: 10px 0;
-    border-bottom: 1px solid #f0f0f0;
-}
-
-.tracking-history li:last-child {
-    border-bottom: none;
-}
-
-/* Botão para Rastrear no Site da Transportadora */
-.tracking-button {	
-	background-color: #333;
-	color: #fff;
-	padding: 10px 15px;
-	border: none;
-	border-radius: 5px;
-	cursor: pointer;
-	font-size: 16px;
-	text-align: center;
-	display: inline-block;
-	transition: background-color 0.3s ease;
-	margin-top: 10px;
-	text-decoration: none;
-	width: 100%;
-	font-weight: 600;
-	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
-}
-
-.tracking-button:hover {
-    background-color: #555;
-	color:white;
-}
-
-.event-date {
-    font-weight: bold;
-    color: #333;
-}
-
-.event-description {
-    color: #555;
-    margin-left: 5px;
-}
-
-.event-location {
-    color: #888;
-    font-size: 14px;
-    margin-left: 5px;
-}
-
-/* Formulário de Rastreamento */
 .wcte-tracking-form {
-    max-width: 600px;
-    margin: 0 auto 20px;
-    padding: 20px;
-    background-color: #f9f9f9;
-    border: 1px solid #e0e0e0;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 30px;
 }
 
 .tracking-form-container {
     display: flex;
     flex-direction: column;
-}
-
-.tracking-label {
-    font-size: 16px;
-    color: #333;
-    margin-bottom: 10px;
-    font-weight: 500;
-    display: block;
+    gap: 10px;
 }
 
 .tracking-input-group {
     display: flex;
-    align-items: center;
-}
-
-#tracking_input {
-    width: 100%;
-    padding: 12px;
-    font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 8px 0 0 8px;
-    outline: none;
-    box-sizing: border-box;
-}
-
-.tracking-submit-button {
-    padding: 12px 20px;
-    font-size: 16px;
-    background-color: #333;
-    color: #fff;
-    border: none;
-    border-radius: 0 8px 8px 0;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-.tracking-submit-button:hover {
-    background-color: #555;
-}
-
-/* Itens do Pedido */
-.order-info {
-    margin-bottom: 20px;
-}
-
-.order-info h3 {
-    font-size: 20px;
-    margin-bottom: 15px;
-    color: #333;
-}
-
-.order-items {
-    display: flex;
-    flex-direction: column;
     gap: 10px;
 }
 
-.order-item {
+.tracking-input-group input {
+    flex: 1;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.tracking-submit-button {
+    padding: 8px 20px;
+    background-color: #ff4747;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.wcte-carrier-info {
+    margin-bottom: 20px;
+}
+
+.wcte-carrier-info h3 {
+    font-size: 18px;
+    margin: 0 0 10px 0;
+}
+
+.wcte-tracking-number {
     display: flex;
     align-items: center;
-    padding: 10px;
-    background-color: #f9f9f9;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    gap: 10px;
+    font-size: 14px;
 }
 
-.order-item img {
-    width: 60px;
-    height: 60px;
-    border-radius: 6px;
-    margin-right: 15px;
-}
-
-.order-item p {
-    font-size: 16px;
-    color: #333;
-    margin: 0;
-}
-
-/* Ajuste para telas menores */
-@media (max-width: 768px) {
-    .order-item img {
-        width: 50px;
-        height: 50px;
-    }
-    .order-item p {
-        font-size: 14px;
-    }
-}
-
-
-/* Outros Pedidos */
-.other-orders {
-    margin-top: 30px;
-    padding: 15px;
-    background-color: #f7f7f7;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-}
-
-.other-orders h3 {
-    font-size: 18px;
-    margin-bottom: 10px;
-    color: #333;
-}
-
-.other-orders ul {
-    list-style: none;
-    padding: 0;
-}
-
-.other-orders li {
-    padding: 8px 0;
-    border-bottom: 1px solid #dcdcdc;
-}
-
-.other-orders li:last-child {
-    border-bottom: none;
-}
-
-.other-orders li a {
-    color: #0073aa;
-    text-decoration: none;
-}
-
-.other-orders li a:hover {
-    text-decoration: underline;
-}
-
-/* Mensagem de Erro */
-.error {
-    color: #b00020;
-    font-weight: bold;
-    text-align: center;
-    margin-top: 15px;
-}
-
-/* Botão de Expansão para Histórico */
-.tracking-history-button {
-    background-color: #0073aa;
-    color: #fff;
-    padding: 8px 12px;
+.wcte-copy-button {
+    background: none;
     border: none;
-    border-radius: 5px;
-    font-size: 16px;
+    color: #1890ff;
     cursor: pointer;
-    text-align: center;
-    margin-top: 10px;
-    display: inline-block;
+    padding: 0;
+    font-size: 14px;
 }
 
-.tracking-history-button:hover {
-    background-color: #005a87;
+.wcte-timeline {
+    position: relative;
+    padding-left: 20px;
+    margin-top: 30px;
+}
+
+.wcte-timeline::before {
+    content: '';
+    position: absolute;
+    left: 5px;
+    top: 0;
+    bottom: 0;
+    width: 1px;
+    background: #e8e8e8;
+}
+
+.wcte-timeline-event {
+    position: relative;
+    padding-bottom: 20px;
+    transition: opacity 0.3s ease;
+}
+
+.wcte-timeline-dot {
+    position: absolute;
+    left: -20px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #e8e8e8;
+    border: 2px solid #fff;
+    box-shadow: 0 0 0 1px #e8e8e8;
+}
+
+.wcte-timeline-dot.active {
+    background: #1890ff;
+    box-shadow: 0 0 0 1px #1890ff;
+}
+
+.wcte-timeline-content {
+    padding-left: 15px;
+}
+
+.wcte-event-title {
+    font-size: 14px;
+    color: #333;
+    margin-bottom: 4px;
+}
+
+.wcte-event-details {
+    font-size: 12px;
+    color: #999;
+}
+
+.wcte-event-location {
+    margin-bottom: 2px;
+}
+
+.wcte-hidden-events {
+    opacity: 0.5;
+    transition: opacity 0.3s ease;
+}
+
+.wcte-hidden-events .wcte-timeline-event:last-child {
+    padding-bottom: 0;
+}
+
+.wcte-show-more-button {
+    background: none;
+    border: 1px solid #e8e8e8;
+    color: #666;
+    padding: 6px 15px;
+    border-radius: 15px;
+    cursor: pointer;
+    font-size: 13px;
+    margin: 10px 0;
+    transition: all 0.3s ease;
+}
+
+.wcte-show-more-button:hover {
+    background: #f5f5f5;
+}
+
+.error {
+    color: #ff4747;
+    padding: 10px;
+    border: 1px solid #ffe4e4;
+    background-color: #fff2f2;
+    border-radius: 4px;
+    margin: 10px 0;
 }

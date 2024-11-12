@@ -26,7 +26,7 @@ class WCTE_Admin_Settings {
         // Submenu para mensagens fictícias
         add_submenu_page(
             'wcte_settings',
-
+            'Mensagens Fictícias',
             'Mensagens Fictícias',
             'manage_options',
             'wcte_fictitious',
@@ -51,7 +51,9 @@ class WCTE_Admin_Settings {
         register_setting( 'wcte_correios_settings', 'wcte_slack_webhook_url' );
 
         // Registra as configurações de mensagens fictícias
-        register_setting( 'wcte_fictitious_settings', 'wcte_fictitious_messages' );
+        register_setting( 'wcte_fictitious_settings', 'wcte_fictitious_messages', array(
+            'sanitize_callback' => array($this, 'sanitize_fictitious_messages')
+        ));
 
         // Seção dos Correios
         add_settings_section(
@@ -128,6 +130,24 @@ class WCTE_Admin_Settings {
         );
     }
 
+    public function sanitize_fictitious_messages($input) {
+        if (!is_array($input)) {
+            return array();
+        }
+
+        $sanitized = array();
+        foreach ($input as $key => $msg) {
+            if (isset($msg['message']) || isset($msg['days']) || isset($msg['hour'])) {
+                $sanitized[$key] = array(
+                    'message' => sanitize_text_field($msg['message']),
+                    'days' => absint($msg['days']),
+                    'hour' => sanitize_text_field($msg['hour'])
+                );
+            }
+        }
+        return $sanitized;
+    }
+
     public function api_key_field_callback() {
         $api_key = get_option( 'wcte_correios_api_key' );
         echo '<input type="text" name="wcte_correios_api_key" value="' . esc_attr( $api_key ) . '" class="regular-text" />';
@@ -179,12 +199,16 @@ class WCTE_Admin_Settings {
     }
 
     public function render_fictitious_page() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
         ?>
         <div class="wrap">
             <h1>Configurações de Mensagens Fictícias</h1>
             <form method="post" action="options.php">
-                <?php settings_fields( 'wcte_fictitious_settings' ); ?>
-                
+                <?php 
+                settings_fields('wcte_fictitious_settings');
+                ?>
                 <table class="widefat">
                     <thead>
                         <tr>
@@ -196,15 +220,15 @@ class WCTE_Admin_Settings {
                     </thead>
                     <tbody>
                         <?php
-                        $messages = get_option( 'wcte_fictitious_messages', array() );
-                        for ( $i = 0; $i < 12; $i++ ) {
-                            $msg = isset( $messages[ $i ] ) ? $messages[ $i ] : array( 'message' => '', 'days' => '', 'hour' => '' );
+                        $messages = get_option('wcte_fictitious_messages', array());
+                        for ($i = 0; $i < 12; $i++) {
+                            $msg = isset($messages[$i]) ? $messages[$i] : array('message' => '', 'days' => '', 'hour' => '');
                             ?>
                             <tr>
-                                <td><?php echo ( $i + 1 ); ?></td>
-                                <td><input type="text" name="wcte_fictitious_messages[<?php echo $i; ?>][message]" value="<?php echo esc_attr( $msg['message'] ); ?>" class="regular-text" /></td>
-                                <td><input type="number" name="wcte_fictitious_messages[<?php echo $i; ?>][days]" value="<?php echo esc_attr( $msg['days'] ); ?>" min="0" class="small-text" /></td>
-                                <td><input type="time" name="wcte_fictitious_messages[<?php echo $i; ?>][hour]" value="<?php echo esc_attr( $msg['hour'] ); ?>" /></td>
+                                <td><?php echo ($i + 1); ?></td>
+                                <td><input type="text" name="wcte_fictitious_messages[<?php echo $i; ?>][message]" value="<?php echo esc_attr($msg['message']); ?>" class="regular-text" /></td>
+                                <td><input type="number" name="wcte_fictitious_messages[<?php echo $i; ?>][days]" value="<?php echo esc_attr($msg['days']); ?>" min="0" class="small-text" /></td>
+                                <td><input type="time" name="wcte_fictitious_messages[<?php echo $i; ?>][hour]" value="<?php echo esc_attr($msg['hour']); ?>" /></td>
                             </tr>
                             <?php
                         }
