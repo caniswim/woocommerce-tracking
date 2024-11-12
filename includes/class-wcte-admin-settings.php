@@ -7,20 +7,37 @@ if ( ! defined( 'ABSPATH' ) ) {
 class WCTE_Admin_Settings {
 
     public function __construct() {
-        add_action( 'admin_menu', array( $this, 'add_settings_page' ) );
+        add_action( 'admin_menu', array( $this, 'add_menu_pages' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
     }
 
-    public function add_settings_page() {
+    public function add_menu_pages() {
+        // Menu principal
         add_menu_page(
             'WooCommerce Tracking Enhanced',           
             'WC Tracking Enhanced',                    
             'manage_options',                          
             'wcte_settings',                           
-            array( $this, 'render_settings_page' ),    
+            array( $this, 'render_credentials_page' ),    
             'dashicons-admin-tools',                   
             56                                         
         );
+
+        // Submenu para mensagens fictícias
+        add_submenu_page(
+            'wcte_settings',
+            'Mensagens Fictícias',
+            'Mensagens Fictícias',
+            'manage_options',
+            'wcte_fictitious_settings',
+            array( $this, 'render_fictitious_page' )
+        );
+
+        // Renomeia o primeiro item do submenu
+        global $submenu;
+        if (isset($submenu['wcte_settings'])) {
+            $submenu['wcte_settings'][0][0] = 'Credenciais';
+        }
     }
 
     public function register_settings() {
@@ -33,7 +50,7 @@ class WCTE_Admin_Settings {
         register_setting( 'wcte_correios_settings', 'wcte_correios_token' );
 
         // Registra as configurações do Slack
-        register_setting( 'wcte_slack_settings', 'wcte_slack_webhook_url' );
+        register_setting( 'wcte_correios_settings', 'wcte_slack_webhook_url' );
 
         // Registra as configurações de mensagens fictícias
         register_setting( 'wcte_fictitious_settings', 'wcte_fictitious_messages' );
@@ -51,15 +68,7 @@ class WCTE_Admin_Settings {
             'wcte_slack_section',
             'Configurações do Slack',
             null,
-            'wcte_slack_settings'
-        );
-
-        // Seção de Mensagens Fictícias
-        add_settings_section(
-            'wcte_fictitious_section',
-            'Configurações de Mensagens Fictícias',
-            null,
-            'wcte_fictitious_settings'
+            'wcte_correios_settings'
         );
 
         // Campos dos Correios
@@ -116,17 +125,8 @@ class WCTE_Admin_Settings {
             'wcte_slack_webhook_url',
             'URL do Webhook do Slack',
             array( $this, 'slack_webhook_field_callback' ),
-            'wcte_slack_settings',
+            'wcte_correios_settings',
             'wcte_slack_section'
-        );
-
-        // Campo de Mensagens Fictícias
-        add_settings_field(
-            'wcte_fictitious_messages',
-            'Mensagens Fictícias',
-            array( $this, 'fictitious_messages_field_callback' ),
-            'wcte_fictitious_settings',
-            'wcte_fictitious_section'
         );
     }
 
@@ -165,65 +165,56 @@ class WCTE_Admin_Settings {
         echo '<input type="text" name="wcte_slack_webhook_url" value="' . esc_attr( $webhook_url ) . '" class="regular-text" />';
     }
 
-    public function fictitious_messages_field_callback() {
-        $messages = get_option( 'wcte_fictitious_messages', array() );
-
-        echo '<table class="widefat">';
-        echo '<thead>';
-        echo '<tr>';
-        echo '<th>Ordem</th>';
-        echo '<th>Mensagem</th>';
-        echo '<th>Dias após o envio</th>';
-        echo '<th>Hora</th>';
-        echo '</tr>';
-        echo '</thead>';
-        echo '<tbody>';
-
-        for ( $i = 0; $i < 12; $i++ ) {
-            $msg = isset( $messages[ $i ] ) ? $messages[ $i ] : array( 'message' => '', 'days' => '', 'hour' => '' );
-
-            echo '<tr>';
-            echo '<td>' . ( $i + 1 ) . '</td>';
-            echo '<td><input type="text" name="wcte_fictitious_messages[' . $i . '][message]" value="' . esc_attr( $msg['message'] ) . '" class="regular-text" /></td>';
-            echo '<td><input type="number" name="wcte_fictitious_messages[' . $i . '][days]" value="' . esc_attr( $msg['days'] ) . '" min="0" class="small-text" /></td>';
-            echo '<td><input type="time" name="wcte_fictitious_messages[' . $i . '][hour]" value="' . esc_attr( $msg['hour'] ) . '" /></td>';
-            echo '</tr>';
-        }
-
-        echo '</tbody>';
-        echo '</table>';
-        echo '<p class="description">Defina as mensagens e quando elas devem ser exibidas após a geração do código de rastreamento.</p>';
-    }
-
-    public function render_settings_page() {
+    public function render_credentials_page() {
         ?>
         <div class="wrap">
             <h1>Configurações do WooCommerce Tracking Enhanced</h1>
-
-            <?php
-            $active_tab = isset($_GET['tab']) ? $_GET['tab'] : 'correios';
-            ?>
-
-            <h2 class="nav-tab-wrapper">
-                <a href="?page=wcte_settings&tab=correios" class="nav-tab <?php echo $active_tab == 'correios' ? 'nav-tab-active' : ''; ?>">Correios</a>
-                <a href="?page=wcte_settings&tab=slack" class="nav-tab <?php echo $active_tab == 'slack' ? 'nav-tab-active' : ''; ?>">Slack</a>
-                <a href="?page=wcte_settings&tab=fictitious" class="nav-tab <?php echo $active_tab == 'fictitious' ? 'nav-tab-active' : ''; ?>">Mensagens Fictícias</a>
-            </h2>
-
             <form method="post" action="options.php">
                 <?php
-                if ($active_tab == 'correios') {
-                    settings_fields('wcte_correios_settings');
-                    do_settings_sections('wcte_correios_settings');
-                } elseif ($active_tab == 'slack') {
-                    settings_fields('wcte_slack_settings');
-                    do_settings_sections('wcte_slack_settings');
-                } else {
-                    settings_fields('wcte_fictitious_settings');
-                    do_settings_sections('wcte_fictitious_settings');
-                }
+                settings_fields( 'wcte_correios_settings' );
+                do_settings_sections( 'wcte_correios_settings' );
                 submit_button();
                 ?>
+            </form>
+        </div>
+        <?php
+    }
+
+    public function render_fictitious_page() {
+        ?>
+        <div class="wrap">
+            <h1>Configurações de Mensagens Fictícias</h1>
+            <form method="post" action="options.php">
+                <?php settings_fields( 'wcte_fictitious_settings' ); ?>
+                
+                <table class="widefat">
+                    <thead>
+                        <tr>
+                            <th>Ordem</th>
+                            <th>Mensagem</th>
+                            <th>Dias após o envio</th>
+                            <th>Hora</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                        $messages = get_option( 'wcte_fictitious_messages', array() );
+                        for ( $i = 0; $i < 12; $i++ ) {
+                            $msg = isset( $messages[ $i ] ) ? $messages[ $i ] : array( 'message' => '', 'days' => '', 'hour' => '' );
+                            ?>
+                            <tr>
+                                <td><?php echo ( $i + 1 ); ?></td>
+                                <td><input type="text" name="wcte_fictitious_messages[<?php echo $i; ?>][message]" value="<?php echo esc_attr( $msg['message'] ); ?>" class="regular-text" /></td>
+                                <td><input type="number" name="wcte_fictitious_messages[<?php echo $i; ?>][days]" value="<?php echo esc_attr( $msg['days'] ); ?>" min="0" class="small-text" /></td>
+                                <td><input type="time" name="wcte_fictitious_messages[<?php echo $i; ?>][hour]" value="<?php echo esc_attr( $msg['hour'] ); ?>" /></td>
+                            </tr>
+                            <?php
+                        }
+                        ?>
+                    </tbody>
+                </table>
+                <p class="description">Defina as mensagens e quando elas devem ser exibidas após a geração do código de rastreamento.</p>
+                <?php submit_button(); ?>
             </form>
         </div>
         <?php
