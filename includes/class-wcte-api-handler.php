@@ -1,188 +1,214 @@
 <?php
 
-if ( ! defined( 'ABSPATH' ) ) {
+if (!defined('ABSPATH')) {
     exit;
 }
 
 class WCTE_API_Handler {
+    // URLs da API de Homologação
+    private const CWS_TOKEN_URL = 'https://api.correios.com.br/token/v1/autentica/cartaopostagem';
+    private const API_RASTRO_URL = 'https://api.correios.com.br/srorastro/v1/objetos/';
 
-    public static function get_tracking_info( $tracking_code ) {
-        // Determina a transportadora
-        if ( preg_match( '/^(LP|CN)/i', $tracking_code ) ) {
-            $carrier = 'cainiao';
-        } else {
-            $carrier = 'correios';
-        }
-
-        if ( $carrier == 'correios' ) {
-            return self::get_correios_tracking_info( $tracking_code );
-        } else {
-            return self::get_cainiao_tracking_info( $tracking_code );
+    /**
+     * Log helper
+     */
+    private static function log($message, $data = null) {
+        if (defined('WP_DEBUG') && WP_DEBUG === true) {
+            $log_message = 'WCTE API: ' . $message;
+            if ($data !== null) {
+                $log_message .= ' - Data: ' . print_r($data, true);
+            }
+            error_log($log_message);
         }
     }
 
-    private static function get_correios_tracking_info( $tracking_code ) {
-        // Obtenha o token antes de fazer a requisição de rastreamento
-        $token = self::get_auth_token();
-        if ( is_wp_error( $token ) || empty( $token ) ) {
-            return array(
-                'status'  => 'error',
-                'message' => 'Falha ao obter o token de autenticação: ' . ( is_wp_error( $token ) ? $token->get_error_message() : 'Token vazio' ),
-            );
+    /**
+     * Obtém informações de rastreamento
+     */
+    public static function get_tracking_info($tracking_code) {
+        self::log('Iniciando consulta para código: ' . $tracking_code);
+
+        if (preg_match('/^(LP|CN)/i', $tracking_code)) {
+            return self::get_cainiao_tracking_info($tracking_code);
+        } else {
+            return self::get_correios_tracking_info($tracking_code);
+        }
+    }
+
+    /**
+     * Obtém o token de autenticação do CWS
+     */
+    private static function get_auth_token() {
+        $cached_token = get_transient('wcte_correios_token');
+        if ($cached_token) {
+            $token_expira_em = get_transient('wcte_correios_token_expira_em');
+            if ($token_expira_em > (time() + (30 * 60))) {
+                self::log('Usando token em cache');
+                return $cached_token;
+            }
         }
 
-        // Endpoint da API dos Correios para rastreamento
-        $endpoint = 'https://api.correios.com.br/rastro/v1/objetos/' . urlencode( $tracking_code );
+        $username = '48004893000170';
+        $codigo_acesso = 'YhDliJoedrwYENVkifjRDgju4xbZsujsLLrcfB03';
+        $cartao_postagem = '0078691788';
+        $auth_header = 'Basic ' . base64_encode($username . ':' . $codigo_acesso);
 
-        // Configura os headers
+        $body = array('numero' => $cartao_postagem);
+
         $args = array(
             'headers' => array(
-                'Accept'        => 'application/json',
-                'User-Agent'    => 'BlazeeWear/1.0',
-                'Authorization' => 'Bearer ' . $token,
+                'Content-Type' => 'application/json',
+                'Accept' => 'application/json',
+                'Authorization' => $auth_header
             ),
-            'timeout' => 20,
+            'body' => json_encode($body),
+            'method' => 'POST',
+            'timeout' => 30
         );
 
-        // Faz a requisição GET para a API dos Correios
-        $response = wp_remote_get( $endpoint, $args );
+        self::log('Solicitando token CWS', [
+            'url' => self::CWS_TOKEN_URL,
+            'headers' => $args['headers'],
+            'body' => $args['body']
+        ]);
 
-        if ( is_wp_error( $response ) ) {
+        $response = wp_remote_post(self::CWS_TOKEN_URL, $args);
+
+        if (is_wp_error($response)) {
+            self::log('Erro ao obter token: ' . $response->get_error_message());
+            return null;
+        }
+
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body_response = wp_remote_retrieve_body($response);
+        $data = json_decode($body_response, true);
+
+        if ($status_code !== 201 || empty($data['token']) || empty($data['expiraEm'])) {
+            self::log('Resposta inválida do CWS', [
+                'status_code' => $status_code,
+                'response' => $body_response
+            ]);
+            return null;
+        }
+
+        $token_expira_em = strtotime($data['expiraEm']);
+        $expires_in = $token_expira_em - time();
+
+        set_transient('wcte_correios_token', $data['token'], $expires_in);
+        set_transient('wcte_correios_token_expira_em', $token_expira_em, $expires_in);
+
+        return $data['token'];
+    }
+
+    /**
+     * Obtém informações de rastreamento dos Correios
+     */
+    private static function get_correios_tracking_info($tracking_code) {
+        $token = self::get_auth_token();
+        if (!$token) {
             return array(
-                'status'  => 'error',
-                'message' => 'Erro ao conectar com a API dos Correios: ' . $response->get_error_message(),
+                'status' => 'error',
+                'message' => 'Não foi possível autenticar com os Correios'
             );
         }
 
-        $status_code = wp_remote_retrieve_response_code( $response );
-        $body        = wp_remote_retrieve_body( $response );
-        $data        = json_decode( $body, true );
+        $url = self::API_RASTRO_URL . $tracking_code . '?resultado=T';
 
-        if ( $status_code != 200 || empty( $data ) ) {
+        $args = array(
+            'headers' => array(
+                'Accept' => 'application/json',
+                'Authorization' => 'Bearer ' . $token
+            ),
+            'timeout' => 30
+        );
+
+        $response = wp_remote_get($url, $args);
+
+        if (is_wp_error($response)) {
             return array(
-                'status'  => 'error',
-                'message' => 'Erro ao obter dados de rastreamento. Código de status: ' . $status_code . '. Resposta: ' . $body,
+                'status' => 'error',
+                'message' => 'Erro ao conectar com a API dos Correios'
             );
         }
 
-        if ( empty( $data['objetos'] ) || isset( $data['objetos'][0]['erros'] ) ) {
+        $status_code = wp_remote_retrieve_response_code($response);
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+
+        if ($status_code !== 200 || empty($data['objetos']) || empty($data['objetos'][0]['eventos'])) {
+            $fictitious_message = self::get_fictitious_message($tracking_code);
             return array(
-                'status'  => 'error',
-                'message' => 'Código de rastreamento não encontrado.',
-            );
-        }
-
-        // Processa os eventos do rastreamento
-        $events = $data['objetos'][0]['eventos'];
-        $has_arrived_in_brazil = false;
-        $filtered_events = array();
-
-        foreach ( $events as $event ) {
-            if ( isset( $event['unidade']['endereco']['codigoPais'] ) && $event['unidade']['endereco']['codigoPais'] == 'BR' ) {
-                $has_arrived_in_brazil = true;
-            }
-
-            if ( $has_arrived_in_brazil ) {
-                $filtered_events[] = array(
-                    'date'        => date( 'd/m/Y H:i', strtotime( $event['dtHrCriado'] ) ),
-                    'description' => $event['descricao'],
-                );
-            }
-        }
-
-        if ( ! $has_arrived_in_brazil ) {
-            $creation_date = self::get_tracking_creation_date( $tracking_code );
-            $fictitious_message = self::get_fictitious_message( $tracking_code, $creation_date );
-
-            return array(
-                'status'  => 'fictitious',
+                'status' => 'fictitious',
                 'message' => $fictitious_message,
             );
         }
 
-        $last_event = reset( $filtered_events );
+        $objeto = $data['objetos'][0];
+
+        if (isset($objeto['mensagem'])) {
+            return array(
+                'status' => 'error',
+                'message' => $objeto['mensagem']
+            );
+        }
+
+        $events = array_reverse($objeto['eventos']);
+        $filtered_events = array();
+
+        foreach ($events as $event) {
+            $location = '';
+            if (isset($event['unidade']['endereco'])) {
+                $endereco = $event['unidade']['endereco'];
+                $location = sprintf('%s - %s/%s',
+                    $endereco['cidade'] ?? '',
+                    $endereco['uf'] ?? '',
+                    $endereco['pais'] ?? 'BR'
+                );
+            }
+
+            $filtered_events[] = array(
+                'date' => date('d/m/Y H:i', strtotime($event['dtHrCriado'])),
+                'description' => $event['descricao'],
+                'location' => $location
+            );
+        }
+
+        $last_event = reset($filtered_events);
         $status = 'in_transit';
-        if ( stripos( $last_event['description'], 'entregue ao destinatário' ) !== false ) {
+
+        if (stripos($last_event['description'], 'entregue') !== false) {
             $status = 'delivered';
         }
 
         return array(
-            'status'  => $status,
+            'status' => $status,
             'message' => $last_event['description'],
-            'data'    => $filtered_events,
+            'data' => $filtered_events
         );
     }
 
-    private static function get_auth_token() {
-        $username = get_option( 'wcte_correios_username' );
-        $password = get_option( 'wcte_correios_api_key' );
-        $stored_token = get_option( 'wcte_correios_token' );
-        $token_expiration = get_option( 'wcte_correios_token_expiration' );
+    /**
+     * Obtém a mensagem fictícia com base no tempo decorrido
+     */
+    private static function get_fictitious_message($tracking_code) {
+        $messages = get_option('wcte_fictitious_messages', array());
+        $creation_date = self::get_tracking_creation_date($tracking_code);
 
-        // Verifica se já existe um token válido
-        if ( ! empty( $stored_token ) && ! empty( $token_expiration ) && strtotime( $token_expiration ) > time() ) {
-            return $stored_token;
+        if (!$creation_date) {
+            return 'Seu pedido está em processamento.';
         }
 
-        $endpoint = 'https://api.correios.com.br/token/v1/autentica';
+        $now = current_time('timestamp');
+        $current_message = 'Seu pedido está em processamento.';
 
-        $args = array(
-            'headers' => array(
-                'Authorization' => 'Basic ' . base64_encode( $username . ':' . $password ),
-                'Accept'        => 'application/json',
-                'User-Agent'    => 'BlazeeWear/1.0',
-            ),
-            'method'  => 'POST',
-            'timeout' => 20,
-        );
+        foreach ($messages as $message_data) {
+            if (empty($message_data['message']) || empty($message_data['days']) || empty($message_data['hour'])) {
+                continue;
+            }
 
-        $response = wp_remote_post( $endpoint, $args );
+            $scheduled_time = strtotime($creation_date . ' +' . intval($message_data['days']) . ' days ' . $message_data['hour']);
 
-        if ( is_wp_error( $response ) ) {
-            return new WP_Error( 'auth_error', 'Erro ao conectar com a API de autenticação: ' . $response->get_error_message() );
-        }
-
-        $status_code = wp_remote_retrieve_response_code( $response );
-        $body        = json_decode( wp_remote_retrieve_body( $response ), true );
-
-        if ( $status_code != 201 || empty( $body['token'] ) || empty( $body['expiraEm'] ) ) {
-            $error_message = isset( $body['mensagem'] ) ? $body['mensagem'] : 'Resposta inválida da API de autenticação.';
-            return new WP_Error( 'auth_error', 'Erro ao obter o token de autenticação: ' . $error_message );
-        }
-
-        // Armazena o novo token e a data de expiração nas opções do WordPress
-        update_option( 'wcte_correios_token', $body['token'] );
-        update_option( 'wcte_correios_token_expiration', $body['expiraEm'] );
-
-        return $body['token'];
-    }
-
-    private static function get_tracking_creation_date( $tracking_code ) {
-        global $wpdb;
-        $table_name = $wpdb->prefix . 'wcte_order_tracking';
-
-        // Consulta a tabela personalizada para obter a data de criação
-        $result = $wpdb->get_var( $wpdb->prepare(
-            "SELECT created_at FROM $table_name WHERE tracking_code = %s",
-            $tracking_code
-        ) );
-
-        if ( $result ) {
-            return $result;
-        } else {
-            // Se não encontrado, retorna a data atual menos 5 dias como padrão
-            return date( 'Y-m-d H:i:s', strtotime( '-5 days' ) );
-        }
-    }
-
-    private static function get_fictitious_message( $tracking_code, $creation_date ) {
-        $messages = get_option( 'wcte_fictitious_messages', array() );
-        $now      = current_time( 'timestamp' );
-        $current_message = 'Aguardando atualização do rastreamento.';
-
-        foreach ( $messages as $message_data ) {
-            $scheduled_time = strtotime( $creation_date . ' +' . $message_data['days'] . ' days ' . $message_data['hour'] );
-            if ( $now >= $scheduled_time ) {
+            if ($now >= $scheduled_time) {
                 $current_message = $message_data['message'];
             }
         }
@@ -190,11 +216,36 @@ class WCTE_API_Handler {
         return $current_message;
     }
 
-    private static function get_cainiao_tracking_info( $tracking_code ) {
-        $iframe_url = 'https://global.cainiao.com/newDetail.htm?mailNoList=' . urlencode( $tracking_code ) . '&otherMailNoList=';
+   /**
+     * Obtém a data de criação do código de rastreamento, se a tabela existir
+     */
+    private static function get_tracking_creation_date($tracking_code) {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'wcte_order_tracking';
+
+        // Verifica se a tabela existe antes de tentar acessar
+        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") != $table_name) {
+            error_log('WCTE - Tabela wp_wcte_order_tracking não existe.');
+            return null;
+        }
+
+        $result = $wpdb->get_row($wpdb->prepare(
+            "SELECT created_at FROM $table_name WHERE tracking_code = %s",
+            $tracking_code
+        ));
+
+        return $result ? $result->created_at : null;
+    }
+
+    /**
+     * Obtém informações de rastreamento do Cainiao e retorna um link para a ParcelsApp
+     */
+    private static function get_cainiao_tracking_info($tracking_code) {
+        $tracking_url = 'https://parcelsapp.com/pt/tracking/' . urlencode($tracking_code);
         return array(
-            'status'     => 'cainiao',
-            'iframe_url' => $iframe_url,
+            'status' => 'cainiao',
+            'tracking_url' => $tracking_url,
+            'message' => 'Clique no botão abaixo para acompanhar seu pedido no site da transportadora.'
         );
     }
 }

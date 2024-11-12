@@ -27,8 +27,8 @@ class WCTE_Tracking_Page {
                 'wcte-script',
                 WCTE_PLUGIN_URL . 'assets/js/script.js',
                 array('jquery'),
-				'1.0.0', // Versão fixa em vez de usar constante
-				true
+                '1.0.0',
+                true
             );
 
             wp_localize_script(
@@ -59,25 +59,23 @@ class WCTE_Tracking_Page {
         try {
             error_log('WCTE - Iniciando processamento de rastreamento');
 
-            // Verifica se o API Handler foi inicializado
             if (!$this->api_handler) {
                 error_log('WCTE - API Handler não inicializado');
                 wp_send_json_error('Erro interno: API Handler não inicializado');
                 return;
             }
 
-            // Verifica se o parâmetro POST foi enviado
             if (!isset($_POST['tracking_input'])) {
                 error_log('WCTE - Parâmetro de tracking ausente');
                 wp_send_json_error('Por favor, informe um código de rastreamento.');
                 return;
             }
 
-            // Sanitiza a entrada do usuário
+            // Sanitiza a entrada e remove o '#' caso esteja presente
             $tracking_input = sanitize_text_field($_POST['tracking_input']);
+            $tracking_input = trim($tracking_input, '#');
             error_log('WCTE - Input recebido: ' . $tracking_input);
 
-            // Determina se é um código de rastreio ou número de pedido
             $tracking_codes = array();
             $order_id = null;
 
@@ -89,6 +87,18 @@ class WCTE_Tracking_Page {
                 if ($order) {
                     $tracking_codes = $this->get_tracking_codes_from_order($order);
                     error_log('WCTE - Códigos encontrados no pedido: ' . print_r($tracking_codes, true));
+
+                    if (empty($tracking_codes)) {
+                        error_log('WCTE - Nenhum código de rastreamento encontrado nas notas do pedido');
+                        wp_send_json_error('Nenhum código de rastreamento encontrado para este pedido.');
+                        return;
+                    }
+
+                    // Inclui informações adicionais do pedido
+                    $response['order_number'] = $order->get_order_number();
+                    $response['order_items'] = $this->get_order_items($order);
+                    $response['other_orders'] = $this->get_other_orders($order->get_billing_email(), $order_id);
+
                 } else {
                     error_log('WCTE - Pedido não encontrado: ' . $order_id);
                     wp_send_json_error('Pedido não encontrado.');
@@ -99,18 +109,11 @@ class WCTE_Tracking_Page {
                 $tracking_codes = array($tracking_input);
             }
 
-            if (empty($tracking_codes)) {
-                error_log('WCTE - Nenhum código de rastreamento encontrado');
-                wp_send_json_error('Nenhum código de rastreamento encontrado.');
-                return;
-            }
-
-            // Processa cada código de rastreio
             $results = array();
             foreach ($tracking_codes as $code) {
                 error_log('WCTE - Consultando código: ' . $code);
                 $tracking_info = $this->api_handler->get_tracking_info($code);
-                
+
                 if ($tracking_info) {
                     error_log('WCTE - Informações obtidas para ' . $code . ': ' . print_r($tracking_info, true));
                     $tracking_info['tracking_code'] = $code;
@@ -122,7 +125,6 @@ class WCTE_Tracking_Page {
                 }
             }
 
-            // Verifica o status de entrega e se há códigos pendentes
             $is_delivered = true;
             $has_pending_codes = false;
 
@@ -137,15 +139,12 @@ class WCTE_Tracking_Page {
                 }
             }
 
-            // Prepara a resposta
-            $response = array(
-                'tracking_results' => $results,
-            );
+            // Adiciona resultados de rastreamento e informações do pedido à resposta
+            $response['tracking_results'] = $results;
 
             if ($is_delivered && !$has_pending_codes && $order_id) {
                 error_log('WCTE - Adicionando informações de itens do pedido');
                 $response['allow_missing_item_form'] = true;
-                $response['order_items'] = $this->get_order_items($order_id);
             }
 
             error_log('WCTE - Enviando resposta de sucesso');
@@ -157,50 +156,73 @@ class WCTE_Tracking_Page {
         }
     }
 
-    private function get_tracking_codes_from_order($order) {
-        try {
-            $tracking_codes = array();
+private function get_tracking_codes_from_order($order) {
+    try {
+        $tracking_codes = array();
 
-            $order_notes = wc_get_order_notes(array(
-                'order_id' => $order->get_id(),
-                'type' => 'customer',
-            ));
+        // Obtém todas as notas do pedido
+        $order_notes = wc_get_order_notes(array(
+            'order_id' => $order->get_id(),
+            'type' => 'any', // Inclui todos os tipos de notas
+        ));
 
-            foreach ($order_notes as $note) {
-                if (preg_match('/Tracking number:\s*(\S+)/i', $note->content, $matches)) {
-                    $tracking_codes[] = $matches[1];
-                }
+        // Expressão regular para capturar os códigos de rastreamento
+        foreach ($order_notes as $note) {
+            if (preg_match_all('/\b([A-Z]{2}[0-9]{9,14}[A-Z]{2})\b|\b(LP\d{12,})\b|\b(CNBR\d{8,})\b|\b(YT\d{16})\b/i', $note->content, $matches)) {
+                $tracking_codes = array_merge($tracking_codes, $matches[0]); // Captura todas as correspondências
             }
-
-            error_log('WCTE - Códigos encontrados nas notas: ' . print_r($tracking_codes, true));
-            return $tracking_codes;
-
-        } catch (Exception $e) {
-            error_log('WCTE - Erro ao buscar códigos do pedido: ' . $e->getMessage());
-            return array();
         }
+
+        // Remove duplicatas dos códigos de rastreamento, caso existam
+        $tracking_codes = array_unique($tracking_codes);
+        error_log('WCTE - Códigos encontrados nas notas: ' . print_r($tracking_codes, true));
+
+        return $tracking_codes;
+
+    } catch (Exception $e) {
+        error_log('WCTE - Erro ao buscar códigos do pedido: ' . $e->getMessage());
+        return array();
+    }
+}
+
+
+
+    private function get_order_items($order) {
+        $items = array();
+
+        foreach ($order->get_items() as $item) {
+            $product = $item->get_product();
+            if ($product) {
+                $image_url = wp_get_attachment_image_url($product->get_image_id(), 'thumbnail');
+                $items[] = array(
+                    'product_id' => $product->get_id(),
+                    'name' => $product->get_name(),
+                    'image' => $image_url,
+                );
+            }
+        }
+
+        error_log('WCTE - Items do pedido: ' . print_r($items, true));
+        return $items;
     }
 
-    private function get_order_items($order_id) {
-        try {
-            $order = wc_get_order($order_id);
-            $items = array();
+    private function get_other_orders($email, $current_order_id) {
+        $other_orders = array();
+        
+        $orders = wc_get_orders(array(
+            'billing_email' => $email,
+            'exclude' => array($current_order_id),
+            'limit' => 5,
+        ));
 
-            if ($order) {
-                foreach ($order->get_items() as $item) {
-                    $items[] = array(
-                        'product_id' => $item->get_product_id(),
-                        'name' => $item->get_name(),
-                    );
-                }
-            }
-
-            error_log('WCTE - Items do pedido: ' . print_r($items, true));
-            return $items;
-
-        } catch (Exception $e) {
-            error_log('WCTE - Erro ao buscar items do pedido: ' . $e->getMessage());
-            return array();
+        foreach ($orders as $order) {
+            $other_orders[] = array(
+                'order_number' => $order->get_order_number(),
+                'date' => $order->get_date_created()->date('d/m/Y'),
+            );
         }
+
+        error_log('WCTE - Outros pedidos do cliente: ' . print_r($other_orders, true));
+        return $other_orders;
     }
 }

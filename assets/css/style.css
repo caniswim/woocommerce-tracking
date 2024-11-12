@@ -1,72 +1,15 @@
-/* Container da página de rastreamento */
-.wcte-tracking-form-container {
-    max-width: 600px;
-    margin: 40px auto;
-    padding: 20px;
-    border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-    background-color: #f9f9f9;
-    font-family: 'Helvetica Neue', sans-serif;
-}
-
-.wcte-tracking-form-container h2 {
-    font-size: 24px;
-    text-align: center;
-    color: #333;
-    margin-bottom: 20px;
-}
-
-.wcte-tracking-form-container label {
-    font-size: 16px;
-    color: #666;
-    display: block;
-    margin-bottom: 10px;
-    font-weight: 500;
-}
-
-.wcte-tracking-form-container input[type="text"] {
-    width: 100%;
-    padding: 12px;
-    font-size: 16px;
-    border: 1px solid #ccc;
-    border-radius: 5px;
-    margin-bottom: 20px;
-    box-sizing: border-box;
-    max-width: 400px;
-}
-
-.track-button {
-    display: inline-block;
-    width: 100%;
-    padding: 12px;
-    font-size: 16px;
-    background-color: #333;
-    color: #fff;
-    text-align: center;
-    border: none;
-    border-radius: 5px;
-    cursor: pointer;
-    transition: background-color 0.3s ease;
-}
-
-.track-button:hover {
-    background-color: #555;
-}
-
-.tracking-results,
-#wcte-tracking-results {
-    margin-top: 30px;
-}
-
+/* Container de Informações de Rastreamento */
 .tracking-info-container {
-    padding: 15px;
+    padding: 20px;
     background-color: #fff;
     border: 1px solid #e0e0e0;
-    border-radius: 8px;
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.05);
+    border-radius: 10px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    font-family: Arial, sans-serif;
 }
 
+/* Informação do Código de Rastreamento */
 .tracking-info {
     padding: 10px 0;
     border-bottom: 1px solid #f0f0f0;
@@ -74,6 +17,12 @@
 
 .tracking-info:last-child {
     border-bottom: none;
+}
+
+.tracking-number {
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 10px;
 }
 
 .tracking-status {
@@ -88,55 +37,73 @@
     margin-top: 5px;
 }
 
-.error {
-    color: #b00020;
-    font-weight: bold;
-    text-align: center;
+/* Histórico de Rastreamento Expansível */
+.tracking-history-container {
+    margin-top: 15px;
 }
 
-/* Formulário de itens faltantes */
-#wcte-missing-item-form {
-    margin-top: 30px;
-}
-
-#wcte-missing-item-form h3 {
-    margin-bottom: 15px;
-}
-
-#wcte-missing-item-form ul {
-    list-style: none;
-    padding: 0;
-}
-
-#wcte-missing-item-form li {
-    margin-bottom: 10px;
-}
-
-#wcte-missing-item-form button {
-    padding: 10px 20px;
-}
-
-/* Código de Rastreamento */
-.tracking-number {
+.toggle-history {
+    background-color: #333;
+    color: #fff;
+    padding: 10px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    width: 100%;
+    text-align: left;
     font-size: 16px;
-    color: #333;
-    margin-bottom: 10px;
 }
 
-/* Histórico de Rastreamento */
+.toggle-history:hover {
+    background-color: #555;
+}
+
+
+@media (max-width: 768px) {
+	.toggle-history {
+		text-align:center;
+	}
+}
+
 .tracking-history {
     list-style: none;
     padding: 0;
     margin-top: 15px;
+    display: none;
 }
 
 .tracking-history li {
-    padding: 8px 0;
+    padding: 10px 0;
     border-bottom: 1px solid #f0f0f0;
 }
 
 .tracking-history li:last-child {
     border-bottom: none;
+}
+
+/* Botão para Rastrear no Site da Transportadora */
+.tracking-button {	
+	background-color: #333;
+	color: #fff;
+	padding: 10px 15px;
+	border: none;
+	border-radius: 5px;
+	cursor: pointer;
+	font-size: 16px;
+	text-align: center;
+	display: inline-block;
+	transition: background-color 0.3s ease;
+	margin-top: 10px;
+	text-decoration: none;
+	width: 100%;
+	font-weight: 600;
+	font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen-Sans, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+}
+
+.tracking-button:hover {
+    background-color: #555;
+	color:white;
 }
 
 .event-date {
@@ -146,4 +113,181 @@
 
 .event-description {
     color: #555;
+    margin-left: 5px;
+}
+
+.event-location {
+    color: #888;
+    font-size: 14px;
+    margin-left: 5px;
+}
+
+/* Formulário de Rastreamento */
+.wcte-tracking-form {
+    max-width: 600px;
+    margin: 0 auto 20px;
+    padding: 20px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tracking-form-container {
+    display: flex;
+    flex-direction: column;
+}
+
+.tracking-label {
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 10px;
+    font-weight: 500;
+    display: block;
+}
+
+.tracking-input-group {
+    display: flex;
+    align-items: center;
+}
+
+#tracking_input {
+    width: 100%;
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid #ccc;
+    border-radius: 8px 0 0 8px;
+    outline: none;
+    box-sizing: border-box;
+}
+
+.tracking-submit-button {
+    padding: 12px 20px;
+    font-size: 16px;
+    background-color: #333;
+    color: #fff;
+    border: none;
+    border-radius: 0 8px 8px 0;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+}
+
+.tracking-submit-button:hover {
+    background-color: #555;
+}
+
+/* Itens do Pedido */
+.order-info {
+    margin-bottom: 20px;
+}
+
+.order-info h3 {
+    font-size: 20px;
+    margin-bottom: 15px;
+    color: #333;
+}
+
+.order-items {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.order-item {
+    display: flex;
+    align-items: center;
+    padding: 10px;
+    background-color: #f9f9f9;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.order-item img {
+    width: 60px;
+    height: 60px;
+    border-radius: 6px;
+    margin-right: 15px;
+}
+
+.order-item p {
+    font-size: 16px;
+    color: #333;
+    margin: 0;
+}
+
+/* Ajuste para telas menores */
+@media (max-width: 768px) {
+    .order-item img {
+        width: 50px;
+        height: 50px;
+    }
+    .order-item p {
+        font-size: 14px;
+    }
+}
+
+
+/* Outros Pedidos */
+.other-orders {
+    margin-top: 30px;
+    padding: 15px;
+    background-color: #f7f7f7;
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+}
+
+.other-orders h3 {
+    font-size: 18px;
+    margin-bottom: 10px;
+    color: #333;
+}
+
+.other-orders ul {
+    list-style: none;
+    padding: 0;
+}
+
+.other-orders li {
+    padding: 8px 0;
+    border-bottom: 1px solid #dcdcdc;
+}
+
+.other-orders li:last-child {
+    border-bottom: none;
+}
+
+.other-orders li a {
+    color: #0073aa;
+    text-decoration: none;
+}
+
+.other-orders li a:hover {
+    text-decoration: underline;
+}
+
+/* Mensagem de Erro */
+.error {
+    color: #b00020;
+    font-weight: bold;
+    text-align: center;
+    margin-top: 15px;
+}
+
+/* Botão de Expansão para Histórico */
+.tracking-history-button {
+    background-color: #0073aa;
+    color: #fff;
+    padding: 8px 12px;
+    border: none;
+    border-radius: 5px;
+    font-size: 16px;
+    cursor: pointer;
+    text-align: center;
+    margin-top: 10px;
+    display: inline-block;
+}
+
+.tracking-history-button:hover {
+    background-color: #005a87;
 }
