@@ -20,6 +20,10 @@ jQuery(document).ready(function($) {
             success: function(response) {
                 if (response.success) {
                     renderTrackingResults(response.data);
+                    // Update URL with tracking input for sharing
+                    const newUrl = new URL(window.location);
+                    newUrl.searchParams.set('tracking_input', trackingInput);
+                    window.history.pushState({}, '', newUrl);
                 } else {
                     $('#wcte-tracking-results').html('<p class="error">' + response.data + '</p>');
                 }
@@ -73,12 +77,11 @@ jQuery(document).ready(function($) {
             htmlContent += '</div>';
         }
 
-        // Sort tracking results
+        // Sort tracking results - active shipments first, delivered ones last
         const sortedResults = [...data.tracking_results].sort((a, b) => {
-            // Helper function to get priority (0: active, 1: cainiao, 2: delivered)
             const getPriority = (result) => {
                 if (result.status === 'cainiao') return 1;
-                return isDeliveredStatus(result) ? 2 : 0;
+                return result.status === 'delivered' ? 2 : 0;
             };
 
             const priorityA = getPriority(a);
@@ -91,13 +94,10 @@ jQuery(document).ready(function($) {
         sortedResults.forEach(function(result) {
             htmlContent += '<div class="wcte-tracking-info">';
             
-            // Carrier info and tracking number
-            htmlContent += '<div class="wcte-carrier-info">';
-            htmlContent += '<h3>' + (result.carrier || 'Rastreamento') + '</h3>';
+            // Tracking number
             htmlContent += '<div class="wcte-tracking-number">';
             htmlContent += '<span>Número de rastreamento: </span>';
             htmlContent += '<strong>' + result.tracking_code + '</strong>';
-            htmlContent += '</div>';
             htmlContent += '</div>';
 
             if (result.status === 'cainiao') {
@@ -108,18 +108,15 @@ jQuery(document).ready(function($) {
             } else if (result.data && result.data.length > 0) {
                 htmlContent += '<div class="wcte-timeline">';
                 
-                // Reverse the data array to show newest events first
-                const reversedData = [...result.data].reverse();
-                
                 // Show first 3 events initially (now the most recent ones)
-                reversedData.slice(0, 3).forEach(function(event, index) {
+                result.data.slice(0, 3).forEach(function(event, index) {
                     htmlContent += renderTimelineEvent(event, index === 0);
                 });
 
                 // Add hidden events
-                if (reversedData.length > 3) {
+                if (result.data.length > 3) {
                     htmlContent += '<div class="wcte-hidden-events" style="display: none;">';
-                    reversedData.slice(3).forEach(function(event) {
+                    result.data.slice(3).forEach(function(event) {
                         htmlContent += renderTimelineEvent(event, false);
                     });
                     htmlContent += '</div>';
@@ -139,7 +136,7 @@ jQuery(document).ready(function($) {
             htmlContent += '<h3>Outros Pedidos</h3>';
             htmlContent += '<div class="wcte-orders-list">';
             data.other_orders.forEach(function(order) {
-                htmlContent += '<div class="wcte-other-order-item">';
+                htmlContent += '<div class="wcte-other-order-item" data-order="' + order.order_number + '">';
                 htmlContent += '<span class="wcte-order-number">Pedido #' + order.order_number + '</span>';
                 htmlContent += '<span class="wcte-order-date">' + order.date + '</span>';
                 htmlContent += '</div>';
@@ -152,6 +149,7 @@ jQuery(document).ready(function($) {
 
         $('#wcte-tracking-results').html(htmlContent);
 
+        // Event handlers
         $('.wcte-show-more-button').on('click', function() {
             var $button = $(this);
             var $hiddenEvents = $button.siblings('.wcte-hidden-events');
@@ -164,22 +162,18 @@ jQuery(document).ready(function($) {
                 $button.text('Ver menos');
             }
         });
-    }
 
-    function isDeliveredStatus(result) {
-        // Skip Cainiao tracking
-        if (result.status === 'cainiao') {
-            return false;
-        }
-
-        // For regular tracking
-        if (result.status === 'delivered') return true;
-        if (result.data && result.data.length > 0) {
-            const lastEvent = result.data[0];
-            return lastEvent.description.toLowerCase().includes('entregue') ||
-                   lastEvent.description.toLowerCase().includes('delivered');
-        }
-        return false;
+        // Make other orders clickable
+        $('.wcte-other-order-item').on('click', function() {
+            var orderNumber = $(this).data('order');
+            $('#tracking_input').val(orderNumber);
+            initiateTracking(orderNumber);
+            
+            // Scroll to top smoothly
+            $('html, body').animate({
+                scrollTop: $('#wcte-form').offset().top
+            }, 500);
+        });
     }
 
     function renderTimelineEvent(event, isActive) {
@@ -196,20 +190,5 @@ jQuery(document).ready(function($) {
         html += '</div>'; // .wcte-timeline-content
         html += '</div>'; // .wcte-timeline-event
         return html;
-    }
-
-    function formatStatus(status) {
-        switch (status) {
-            case 'in_transit':
-                return 'Em Trânsito';
-            case 'delivered':
-                return 'Entregue';
-            case 'no_data':
-                return 'Objeto Não Encontrado';
-            case 'error':
-                return 'Erro na Consulta';
-            default:
-                return status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ');
-        }
     }
 });
