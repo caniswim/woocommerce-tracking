@@ -5,10 +5,53 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 class WCTE_Admin_Settings {
+    private $logs = array();
 
     public function __construct() {
         add_action( 'admin_menu', array( $this, 'add_menu_pages' ) );
         add_action( 'admin_init', array( $this, 'register_settings' ) );
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_scripts' ) );
+        add_action( 'wp_ajax_wcte_clear_logs', array( $this, 'clear_logs' ) );
+    }
+
+    public function enqueue_admin_scripts($hook) {
+        if (strpos($hook, 'wcte_settings') === false) {
+            return;
+        }
+
+        wp_enqueue_script('wcte-admin', WCTE_PLUGIN_URL . 'assets/js/admin.js', array('jquery'), '1.0.0', true);
+        wp_localize_script('wcte-admin', 'wcte_admin', array(
+            'ajax_url' => admin_url('admin-ajax.php'),
+            'nonce' => wp_create_nonce('wcte_admin_nonce')
+        ));
+
+        wp_add_inline_style('admin-bar', '
+            .wcte-logs-viewer {
+                background: #f6f7f7;
+                border: 1px solid #ddd;
+                padding: 10px;
+                margin-top: 20px;
+                border-radius: 4px;
+            }
+            .wcte-logs-viewer textarea {
+                width: 100%;
+                min-height: 300px;
+                font-family: monospace;
+                margin-bottom: 10px;
+            }
+            .wcte-firebase-rules {
+                background: #f6f7f7;
+                border: 1px solid #ddd;
+                padding: 15px;
+                margin: 20px 0;
+                border-radius: 4px;
+            }
+            .wcte-firebase-rules pre {
+                background: #fff;
+                padding: 10px;
+                overflow-x: auto;
+            }
+        ');
     }
 
     public function add_menu_pages() {
@@ -72,7 +115,7 @@ class WCTE_Admin_Settings {
         add_settings_section(
             'wcte_firebase_section',
             'Configurações do Firebase',
-            null,
+            array($this, 'render_firebase_section'),
             'wcte_correios_settings'
         );
 
@@ -168,6 +211,46 @@ class WCTE_Admin_Settings {
         );
     }
 
+    public function render_firebase_section() {
+        ?>
+        <div class="wcte-firebase-rules">
+            <h3>Regras Recomendadas do Firebase</h3>
+            <p>Configure estas regras de segurança no console do Firebase para garantir o funcionamento adequado do plugin:</p>
+            <pre>
+{
+  "rules": {
+    "tracking": {
+      "$tracking_code": {
+        ".read": true,
+        ".write": "auth != null || !data.exists()",
+        "fake_updates": {
+          ".read": true,
+          ".write": "auth != null || !data.exists()"
+        },
+        "created_at": {
+          ".read": true,
+          ".write": "auth != null || !data.exists()"
+        },
+        "has_real_tracking": {
+          ".read": true,
+          ".write": "auth != null || !data.exists()"
+        }
+      }
+    }
+  }
+}
+            </pre>
+            <p>Estas regras permitem:</p>
+            <ul>
+                <li>Leitura pública dos dados de rastreamento</li>
+                <li>Criação de novos registros de rastreamento</li>
+                <li>Atualizações apenas através de autenticação</li>
+                <li>Proteção contra modificação não autorizada de dados existentes</li>
+            </ul>
+        </div>
+        <?php
+    }
+
     public function sanitize_fictitious_messages($input) {
         if (!is_array($input)) {
             return array();
@@ -253,8 +336,84 @@ class WCTE_Admin_Settings {
                 submit_button();
                 ?>
             </form>
+
+            <div class="wcte-logs-viewer">
+                <h2>Logs do Sistema</h2>
+                <textarea id="wcte-logs" readonly><?php echo esc_textarea($this->get_logs()); ?></textarea>
+                <button type="button" class="button button-secondary" id="wcte-clear-logs">Limpar Logs</button>
+                <button type="button" class="button button-secondary" id="wcte-refresh-logs">Atualizar Logs</button>
+            </div>
         </div>
+
+        <script>
+        jQuery(document).ready(function($) {
+            function refreshLogs() {
+                $.post(ajaxurl, {
+                    action: 'wcte_get_logs',
+                    nonce: wcte_admin.nonce
+                }, function(response) {
+                    if (response.success) {
+                        $('#wcte-logs').val(response.data);
+                    }
+                });
+            }
+
+            $('#wcte-clear-logs').on('click', function() {
+                if (confirm('Tem certeza que deseja limpar os logs?')) {
+                    $.post(ajaxurl, {
+                        action: 'wcte_clear_logs',
+                        nonce: wcte_admin.nonce
+                    }, function(response) {
+                        if (response.success) {
+                            $('#wcte-logs').val('');
+                        }
+                    });
+                }
+            });
+
+            $('#wcte-refresh-logs').on('click', function() {
+                refreshLogs();
+            });
+
+            // Auto refresh logs every 30 seconds
+            setInterval(refreshLogs, 30000);
+        });
+        </script>
         <?php
+    }
+
+    private function get_logs() {
+        $log_file = WP_CONTENT_DIR . '/debug.log';
+        if (file_exists($log_file)) {
+            $logs = file_get_contents($log_file);
+            // Filter only WCTE related logs
+            $filtered_logs = array();
+            $lines = explode("\n", $logs);
+            foreach ($lines as $line) {
+                if (strpos($line, 'WCTE') !== false) {
+                    $filtered_logs[] = $line;
+                }
+            }
+            return implode("\n", $filtered_logs);
+        }
+        return 'Nenhum log encontrado.';
+    }
+
+    public function clear_logs() {
+        check_ajax_referer('wcte_admin_nonce', 'nonce');
+        
+        if (!current_user_can('manage_options')) {
+            wp_send_json_error('Permissão negada');
+            return;
+        }
+
+        $log_file = WP_CONTENT_DIR . '/debug.log';
+        if (file_exists($log_file)) {
+            file_put_contents($log_file, '');
+            wp_send_json_success();
+        } else {
+            wp_send_json_error('Arquivo de log não encontrado');
+        }
     }
 
     public function render_fictitious_page() {
