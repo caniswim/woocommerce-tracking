@@ -33,9 +33,28 @@ class WCTE_API_Handler {
      * Get current time in Sao Paulo timezone
      */
     private static function get_current_time() {
-        $timezone = self::get_timezone();
-        $datetime = new DateTime('now', $timezone);
-        return $datetime->getTimestamp();
+        try {
+            $timezone = self::get_timezone();
+            $datetime = new DateTime('now', $timezone);
+            return $datetime->getTimestamp();
+        } catch (Exception $e) {
+            self::log('Erro ao obter horário atual: ' . $e->getMessage());
+            return time();
+        }
+    }
+
+    /**
+     * Format current datetime in Sao Paulo timezone
+     */
+    private static function get_current_datetime($format = 'Y-m-d H:i:s') {
+        try {
+            $timezone = self::get_timezone();
+            $datetime = new DateTime('now', $timezone);
+            return $datetime->format($format);
+        } catch (Exception $e) {
+            self::log('Erro ao formatar horário atual: ' . $e->getMessage());
+            return date($format);
+        }
     }
 
     /**
@@ -71,29 +90,34 @@ class WCTE_API_Handler {
      * Initialize tracking data in Firebase
      */
     private static function initialize_tracking($tracking_code) {
-        $timezone = self::get_timezone();
-        $datetime = new DateTime('now', $timezone);
+        try {
+            $tracking_data = array(
+                'tracking_code' => $tracking_code,
+                'carrier' => 'correios',
+                'tracking_status' => 'pending',
+                'created_at' => self::get_current_datetime(),
+                'has_real_tracking' => false
+            );
 
-        $tracking_data = array(
-            'tracking_code' => $tracking_code,
-            'carrier' => 'correios',
-            'tracking_status' => 'pending',
-            'created_at' => $datetime->format('Y-m-d H:i:s'),
-            'has_real_tracking' => false
-        );
-
-        if (WCTE_Database::save_tracking_data($tracking_data)) {
-            $fictitious_message = self::get_fictitious_message($tracking_code, true);
-            if ($fictitious_message) {
-                $update_data = array(
-                    'message' => $fictitious_message,
-                    'timestamp' => self::get_current_time()
-                );
-                WCTE_Database::save_fake_update($tracking_code, $update_data);
+            if (WCTE_Database::save_tracking_data($tracking_data)) {
+                $fictitious_message = self::get_fictitious_message($tracking_code, true);
+                if ($fictitious_message) {
+                    $fake_date = self::get_current_datetime();
+                    $update_data = array(
+                        'message' => $fictitious_message,
+                        'timestamp' => self::get_current_time(),
+                        'date' => $fake_date,
+                        'datetime' => $fake_date
+                    );
+                    WCTE_Database::save_fake_update($tracking_code, $update_data);
+                }
+                return true;
             }
-            return true;
+            return false;
+        } catch (Exception $e) {
+            self::log('Erro ao inicializar rastreamento: ' . $e->getMessage());
+            return false;
         }
-        return false;
     }
 
     /**
@@ -202,7 +226,8 @@ class WCTE_API_Handler {
                 if (!$message_exists) {
                     $valid_messages[] = array(
                         'message' => $message_data['message'],
-                        'time' => $scheduled_time
+                        'time' => $scheduled_time,
+                        'hour' => $message_data['hour']
                     );
                 }
             }
@@ -224,7 +249,6 @@ class WCTE_API_Handler {
     public static function get_tracking_info($tracking_code) {
         self::log('Iniciando consulta para código: ' . $tracking_code);
 
-        // Check if tracking exists in Firebase, if not initialize it
         $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
         if (!$creation_date) {
             self::initialize_tracking($tracking_code);
@@ -235,21 +259,21 @@ class WCTE_API_Handler {
         } else {
             $tracking_info = self::get_correios_tracking_info($tracking_code);
 
-            // Only use fake updates if we don't have real tracking data
             if ($tracking_info['status'] === 'error' || empty($tracking_info['data'])) {
-                // Check for new fictional updates that should be added
                 if (self::should_generate_fictional_update($tracking_code)) {
                     $fictitious_message = self::get_fictitious_message($tracking_code);
                     if ($fictitious_message) {
+                        $fake_date = self::get_current_datetime();
                         $update_data = array(
                             'message' => $fictitious_message,
-                            'timestamp' => self::get_current_time()
+                            'timestamp' => self::get_current_time(),
+                            'date' => $fake_date,
+                            'datetime' => $fake_date
                         );
                         WCTE_Database::save_fake_update($tracking_code, $update_data);
                     }
                 }
 
-                // Get all fake updates
                 $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
                 if (!empty($fake_updates)) {
                     $formatted_updates = WCTE_Database::format_fake_updates($fake_updates);
@@ -260,7 +284,6 @@ class WCTE_API_Handler {
                     );
                 }
             } else {
-                // If we have real tracking data, clear fictional updates
                 self::maybe_clear_fictional_updates($tracking_code);
             }
 
@@ -334,7 +357,6 @@ class WCTE_API_Handler {
                 );
             }
 
-            // Convert event time to configured timezone
             $event_date = new DateTime($event['dtHrCriado']);
             $event_date->setTimezone($timezone);
 
