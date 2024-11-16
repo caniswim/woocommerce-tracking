@@ -26,12 +26,11 @@ class WCTE_API_Handler {
      * Get configured timezone
      */
     private static function get_timezone() {
-        $timezone = get_option('wcte_timezone', 'America/Sao_Paulo');
-        return new DateTimeZone($timezone);
+        return new DateTimeZone('America/Sao_Paulo');
     }
 
     /**
-     * Get current time in configured timezone
+     * Get current time in Sao Paulo timezone
      */
     private static function get_current_time() {
         $timezone = self::get_timezone();
@@ -40,12 +39,32 @@ class WCTE_API_Handler {
     }
 
     /**
-     * Convert time string to timestamp in configured timezone
+     * Convert time string to timestamp in Sao Paulo timezone
      */
     private static function convert_to_timestamp($time_string) {
-        $timezone = self::get_timezone();
-        $datetime = new DateTime($time_string, $timezone);
-        return $datetime->getTimestamp();
+        try {
+            $timezone = self::get_timezone();
+            $datetime = new DateTime($time_string, $timezone);
+            return $datetime->getTimestamp();
+        } catch (Exception $e) {
+            self::log('Erro ao converter timestamp: ' . $e->getMessage());
+            return time();
+        }
+    }
+
+    /**
+     * Format date with timezone
+     */
+    private static function format_date_with_timezone($date_string, $format = 'Y-m-d H:i:s') {
+        try {
+            $timezone = self::get_timezone();
+            $date = new DateTime($date_string);
+            $date->setTimezone($timezone);
+            return $date->format($format);
+        } catch (Exception $e) {
+            self::log('Erro ao formatar data: ' . $e->getMessage());
+            return date($format);
+        }
     }
 
     /**
@@ -54,7 +73,7 @@ class WCTE_API_Handler {
     private static function initialize_tracking($tracking_code) {
         $timezone = self::get_timezone();
         $datetime = new DateTime('now', $timezone);
-        
+
         $tracking_data = array(
             'tracking_code' => $tracking_code,
             'carrier' => 'correios',
@@ -63,9 +82,7 @@ class WCTE_API_Handler {
             'has_real_tracking' => false
         );
 
-        // Save initial tracking data
         if (WCTE_Database::save_tracking_data($tracking_data)) {
-            // Generate first fictional message immediately
             $fictitious_message = self::get_fictitious_message($tracking_code, true);
             if ($fictitious_message) {
                 $update_data = array(
@@ -77,6 +94,128 @@ class WCTE_API_Handler {
             return true;
         }
         return false;
+    }
+
+    /**
+     * Get next scheduled message time
+     */
+    private static function get_scheduled_message_time($creation_date, $days, $hour) {
+        try {
+            $timezone = self::get_timezone();
+            $base_date = new DateTime($creation_date, $timezone);
+            $base_date->modify('+' . intval($days) . ' days');
+
+            list($hour_val, $minute_val) = explode(':', $hour);
+            $base_date->setTime((int)$hour_val, (int)$minute_val);
+
+            return $base_date->getTimestamp();
+        } catch (Exception $e) {
+            self::log('Erro ao calcular tempo agendado: ' . $e->getMessage());
+            return time();
+        }
+    }
+
+    /**
+     * Verifica se devemos gerar uma nova atualização fictícia
+     */
+    private static function should_generate_fictional_update($tracking_code) {
+        $tracking_status = WCTE_Database::get_tracking_status($tracking_code);
+
+        if ($tracking_status) {
+            return false;
+        }
+
+        $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
+        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
+
+        if (!$creation_date) {
+            return true;
+        }
+
+        $messages = get_option('wcte_fictitious_messages', array());
+        $now = self::get_current_time();
+
+        foreach ($messages as $message_data) {
+            if (empty($message_data['message']) || !isset($message_data['days']) || empty($message_data['hour'])) {
+                continue;
+            }
+
+            $scheduled_time = self::get_scheduled_message_time($creation_date, $message_data['days'], $message_data['hour']);
+
+            if ($now >= $scheduled_time) {
+                $message_exists = false;
+                foreach ($fake_updates as $update) {
+                    if ($update['message'] === $message_data['message']) {
+                        $message_exists = true;
+                        break;
+                    }
+                }
+
+                if (!$message_exists) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Obtém a mensagem fictícia com base no tempo decorrido
+     */
+    private static function get_fictitious_message($tracking_code, $first_message = false) {
+        $messages = get_option('wcte_fictitious_messages', array());
+        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
+
+        if (!$creation_date) {
+            return 'Seu pedido está em processamento.';
+        }
+
+        $now = self::get_current_time();
+
+        if ($first_message) {
+            foreach ($messages as $message_data) {
+                if (isset($message_data['days']) && $message_data['days'] == 0 && !empty($message_data['message'])) {
+                    return $message_data['message'];
+                }
+            }
+        }
+
+        $valid_messages = array();
+        foreach ($messages as $message_data) {
+            if (empty($message_data['message']) || !isset($message_data['days']) || empty($message_data['hour'])) {
+                continue;
+            }
+
+            $scheduled_time = self::get_scheduled_message_time($creation_date, $message_data['days'], $message_data['hour']);
+
+            if ($now >= $scheduled_time) {
+                $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
+                $message_exists = false;
+                foreach ($fake_updates as $update) {
+                    if ($update['message'] === $message_data['message']) {
+                        $message_exists = true;
+                        break;
+                    }
+                }
+
+                if (!$message_exists) {
+                    $valid_messages[] = array(
+                        'message' => $message_data['message'],
+                        'time' => $scheduled_time
+                    );
+                }
+            }
+        }
+
+        if (!empty($valid_messages)) {
+            usort($valid_messages, function($a, $b) {
+                return $a['time'] - $b['time'];
+            });
+            return $valid_messages[0]['message'];
+        }
+
+        return null;
     }
 
     /**
@@ -95,7 +234,7 @@ class WCTE_API_Handler {
             return self::get_cainiao_tracking_info($tracking_code);
         } else {
             $tracking_info = self::get_correios_tracking_info($tracking_code);
-            
+
             // Only use fake updates if we don't have real tracking data
             if ($tracking_info['status'] === 'error' || empty($tracking_info['data'])) {
                 // Check for new fictional updates that should be added
@@ -124,7 +263,7 @@ class WCTE_API_Handler {
                 // If we have real tracking data, clear fictional updates
                 self::maybe_clear_fictional_updates($tracking_code);
             }
-            
+
             return $tracking_info;
         }
     }
@@ -296,123 +435,12 @@ class WCTE_API_Handler {
      */
     private static function maybe_clear_fictional_updates($tracking_code) {
         $tracking_status = WCTE_Database::get_tracking_status($tracking_code);
-        
+
         // If we haven't marked this tracking as having real data yet
         if (!$tracking_status) {
             // Clear fictional updates and mark as having real data
             WCTE_Database::clear_fake_updates($tracking_code);
         }
-    }
-
-    /**
-     * Verifica se devemos gerar uma nova atualização fictícia
-     */
-    private static function should_generate_fictional_update($tracking_code) {
-        $tracking_status = WCTE_Database::get_tracking_status($tracking_code);
-        
-        // Don't generate if we already have real tracking data
-        if ($tracking_status) {
-            return false;
-        }
-
-        $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
-        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
-        
-        if (!$creation_date) {
-            return true;
-        }
-
-        // Get the next scheduled message
-        $messages = get_option('wcte_fictitious_messages', array());
-        $now = self::get_current_time();
-        $creation_timestamp = self::convert_to_timestamp($creation_date);
-
-        foreach ($messages as $message_data) {
-            if (empty($message_data['message']) || !isset($message_data['days']) || empty($message_data['hour'])) {
-                continue;
-            }
-
-            $scheduled_time = strtotime($creation_date . ' +' . intval($message_data['days']) . ' days ' . $message_data['hour']);
-            
-            // If this message should be shown now and we haven't shown it yet
-            if ($now >= $scheduled_time) {
-                $message_exists = false;
-                foreach ($fake_updates as $update) {
-                    if ($update['message'] === $message_data['message']) {
-                        $message_exists = true;
-                        break;
-                    }
-                }
-                
-                if (!$message_exists) {
-                    return true;
-                }
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * Obtém a mensagem fictícia com base no tempo decorrido
-     */
-    private static function get_fictitious_message($tracking_code, $first_message = false) {
-        $messages = get_option('wcte_fictitious_messages', array());
-        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
-
-        if (!$creation_date) {
-            return 'Seu pedido está em processamento.';
-        }
-
-        $now = self::get_current_time();
-
-        // If this is the first message, return the day 0 message
-        if ($first_message) {
-            foreach ($messages as $message_data) {
-                if (isset($message_data['days']) && $message_data['days'] == 0 && !empty($message_data['message'])) {
-                    return $message_data['message'];
-                }
-            }
-        }
-
-        // Get all messages that should be shown by now
-        $valid_messages = array();
-        foreach ($messages as $message_data) {
-            if (empty($message_data['message']) || !isset($message_data['days']) || empty($message_data['hour'])) {
-                continue;
-            }
-
-            $scheduled_time = strtotime($creation_date . ' +' . intval($message_data['days']) . ' days ' . $message_data['hour']);
-            
-            if ($now >= $scheduled_time) {
-                // Check if this message has already been used
-                $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
-                $message_exists = false;
-                foreach ($fake_updates as $update) {
-                    if ($update['message'] === $message_data['message']) {
-                        $message_exists = true;
-                        break;
-                    }
-                }
-                
-                if (!$message_exists) {
-                    $valid_messages[] = array(
-                        'message' => $message_data['message'],
-                        'time' => $scheduled_time
-                    );
-                }
-            }
-        }
-
-        // Sort by scheduled time and get the earliest message
-        if (!empty($valid_messages)) {
-            usort($valid_messages, function($a, $b) {
-                return $a['time'] - $b['time'];
-            });
-            return $valid_messages[0]['message'];
-        }
-
-        return null;
     }
 
     /**
