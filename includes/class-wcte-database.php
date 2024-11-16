@@ -49,7 +49,8 @@ class WCTE_Database {
                 'carrier' => $data['carrier'],
                 'tracking_status' => $data['tracking_status'] ?? 'pending',
                 'created_at' => date('Y-m-d H:i:s'),
-                'fake_updates' => array()
+                'fake_updates' => array(),
+                'has_real_tracking' => false
             );
 
             $args = array(
@@ -107,6 +108,12 @@ class WCTE_Database {
      */
     public static function save_fake_update($tracking_code, $update_data) {
         try {
+            // First check if real tracking exists
+            $has_real_tracking = self::get_tracking_status($tracking_code);
+            if ($has_real_tracking === true) {
+                return false;
+            }
+
             $url = self::$firebase_config['databaseURL'] . '/tracking/' . $tracking_code . '/fake_updates.json';
             $api_key = self::$firebase_config['apiKey'];
 
@@ -125,9 +132,21 @@ class WCTE_Database {
                 $existing_updates = json_decode($body, true) ?: array();
             }
 
+            // Check if this message already exists
+            foreach ($existing_updates as $update) {
+                if ($update['message'] === $update_data['message']) {
+                    return true; // Message already exists
+                }
+            }
+
             // Add new update
             $update_data['timestamp'] = time();
             $existing_updates[] = $update_data;
+
+            // Sort updates by timestamp
+            usort($existing_updates, function($a, $b) {
+                return $a['timestamp'] - $b['timestamp'];
+            });
 
             // Save all updates
             $args = array(
@@ -155,6 +174,12 @@ class WCTE_Database {
      */
     public static function get_fake_updates($tracking_code) {
         try {
+            // First check if real tracking exists
+            $has_real_tracking = self::get_tracking_status($tracking_code);
+            if ($has_real_tracking === true) {
+                return array();
+            }
+
             $url = self::$firebase_config['databaseURL'] . '/tracking/' . $tracking_code . '/fake_updates.json';
             $api_key = self::$firebase_config['apiKey'];
 
@@ -177,6 +202,76 @@ class WCTE_Database {
         } catch (Exception $e) {
             error_log('WCTE Firebase - Exception: ' . $e->getMessage());
             return array();
+        }
+    }
+
+    /**
+     * Clear fake updates when real tracking begins
+     */
+    public static function clear_fake_updates($tracking_code) {
+        try {
+            $url = self::$firebase_config['databaseURL'] . '/tracking/' . $tracking_code . '.json';
+            $api_key = self::$firebase_config['apiKey'];
+
+            if (empty($url) || empty($api_key)) {
+                return false;
+            }
+
+            $url .= '?key=' . $api_key;
+
+            // Update tracking data to mark as having real tracking and clear fake updates
+            $update_data = array(
+                'fake_updates' => array(),
+                'has_real_tracking' => true
+            );
+
+            $args = array(
+                'method' => 'PATCH',
+                'headers' => array('Content-Type' => 'application/json'),
+                'body' => json_encode($update_data)
+            );
+
+            $response = wp_remote_request($url, $args);
+
+            if (is_wp_error($response)) {
+                error_log('WCTE Firebase - Error clearing fake updates: ' . $response->get_error_message());
+                return false;
+            }
+
+            return true;
+        } catch (Exception $e) {
+            error_log('WCTE Firebase - Exception: ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Get tracking status (whether it has real tracking data)
+     */
+    public static function get_tracking_status($tracking_code) {
+        try {
+            $url = self::$firebase_config['databaseURL'] . '/tracking/' . $tracking_code . '/has_real_tracking.json';
+            $api_key = self::$firebase_config['apiKey'];
+
+            if (empty($url) || empty($api_key)) {
+                return false;
+            }
+
+            $url .= '?key=' . $api_key;
+
+            $response = wp_remote_get($url);
+
+            if (is_wp_error($response)) {
+                return false;
+            }
+
+            $body = wp_remote_retrieve_body($response);
+            $has_real_tracking = json_decode($body, true);
+
+            return $has_real_tracking === true;
+        } catch (Exception $e) {
+            error_log('WCTE Firebase - Exception: ' . $e->getMessage());
+            return false;
         }
     }
 
