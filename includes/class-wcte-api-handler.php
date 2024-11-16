@@ -258,8 +258,10 @@ class WCTE_API_Handler {
             return self::get_cainiao_tracking_info($tracking_code);
         } else {
             $tracking_info = self::get_correios_tracking_info($tracking_code);
-
+            $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
+            
             if ($tracking_info['status'] === 'error' || empty($tracking_info['data'])) {
+                // Se não há dados reais, verifica se deve gerar nova mensagem fictícia
                 if (self::should_generate_fictional_update($tracking_code)) {
                     $fictitious_message = self::get_fictitious_message($tracking_code);
                     if ($fictitious_message) {
@@ -271,10 +273,10 @@ class WCTE_API_Handler {
                             'datetime' => $fake_date
                         );
                         WCTE_Database::save_fake_update($tracking_code, $update_data);
+                        $fake_updates = WCTE_Database::get_fake_updates($tracking_code); // Atualiza lista de mensagens
                     }
                 }
 
-                $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
                 if (!empty($fake_updates)) {
                     $formatted_updates = WCTE_Database::format_fake_updates($fake_updates);
                     return array(
@@ -284,7 +286,21 @@ class WCTE_API_Handler {
                     );
                 }
             } else {
-                self::maybe_clear_fictional_updates($tracking_code);
+                // Se há dados reais, marca como tendo rastreio real
+                WCTE_Database::mark_as_real_tracking($tracking_code);
+                
+                // Combina as atualizações fictícias com as reais
+                if (!empty($fake_updates)) {
+                    $formatted_fake_updates = WCTE_Database::format_fake_updates($fake_updates);
+                    
+                    // Ordena todas as atualizações por data
+                    $all_updates = array_merge($formatted_fake_updates, $tracking_info['data']);
+                    usort($all_updates, function($a, $b) {
+                        return strtotime(str_replace('/', '-', $a['date'])) - strtotime(str_replace('/', '-', $b['date']));
+                    });
+                    
+                    $tracking_info['data'] = $all_updates;
+                }
             }
 
             return $tracking_info;
@@ -450,19 +466,6 @@ class WCTE_API_Handler {
         set_transient('wcte_correios_token_expira_em', $token_expira_em, $expires_in);
 
         return $data['token'];
-    }
-
-    /**
-     * Clear fictional updates when real tracking begins
-     */
-    private static function maybe_clear_fictional_updates($tracking_code) {
-        $tracking_status = WCTE_Database::get_tracking_status($tracking_code);
-
-        // If we haven't marked this tracking as having real data yet
-        if (!$tracking_status) {
-            // Clear fictional updates and mark as having real data
-            WCTE_Database::clear_fake_updates($tracking_code);
-        }
     }
 
     /**

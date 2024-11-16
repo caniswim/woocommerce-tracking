@@ -266,9 +266,9 @@ class WCTE_Database {
     }
 
     /**
-     * Clear fake updates when real tracking begins
+     * Mark tracking as having real updates without clearing fake ones
      */
-    public static function clear_fake_updates($tracking_code) {
+    public static function mark_as_real_tracking($tracking_code) {
         try {
             if (!self::$firebase_config) {
                 self::init();
@@ -283,11 +283,10 @@ class WCTE_Database {
 
             $url .= '?key=' . $api_key;
 
-            self::log('Clearing fake updates at URL', $url);
+            self::log('Marcando rastreio como real em URL', $url);
 
-            // Update tracking data to mark as having real tracking and clear fake updates
+            // Apenas atualiza o status de rastreio real, mantendo as mensagens fictícias
             $update_data = array(
-                'fake_updates' => array(),
                 'has_real_tracking' => true
             );
 
@@ -297,12 +296,12 @@ class WCTE_Database {
                 'body' => json_encode($update_data)
             );
 
-            self::log('Clear fake updates request', $args);
+            self::log('Mark as real tracking request', $args);
 
             $response = wp_remote_request($url, $args);
 
             if (is_wp_error($response)) {
-                self::log('Error clearing fake updates: ' . $response->get_error_message());
+                self::log('Erro ao marcar rastreio como real: ' . $response->get_error_message());
                 return false;
             }
 
@@ -365,8 +364,18 @@ class WCTE_Database {
     public static function format_fake_updates($fake_updates) {
         $formatted_updates = array();
         foreach ($fake_updates as $update) {
+            // Verifica se existe o campo datetime ou date nas atualizações novas
+            if (isset($update['datetime'])) {
+                $date = $update['datetime'];
+            } elseif (isset($update['date'])) {
+                $date = $update['date'];
+            } else {
+                // Fallback para o formato antigo usando timestamp
+                $date = date('d/m/Y H:i', $update['timestamp']);
+            }
+
             $formatted_updates[] = array(
-                'date' => date('d/m/Y H:i', $update['timestamp']),
+                'date' => $date,
                 'description' => $update['message'],
                 'location' => 'Brasil'
             );

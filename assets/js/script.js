@@ -185,7 +185,7 @@ jQuery(document).ready(function($) {
         if (event.location) {
             html += '<div class="wcte-event-location">' + event.location + '</div>';
         }
-        html += '<div class="wcte-event-date">' + event.date + '</div>';
+        html += '<div class="wcte-event-date">' + event.movement_date + '</div>'; // Changed from event.date to event.movement_date
         html += '</div>'; // .wcte-event-details
         html += '</div>'; // .wcte-timeline-content
         html += '</div>'; // .wcte-timeline-event
