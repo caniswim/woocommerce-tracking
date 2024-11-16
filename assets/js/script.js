@@ -185,9 +185,7 @@ jQuery(document).ready(function($) {
         if (event.location) {
             html += '<div class="wcte-event-location">' + event.location + '</div>';
         }
-        // Usa o datetime do evento se disponível, caso contrário usa o date
-        var eventDate = event.datetime || event.date;
-        html += '<div class="wcte-event-date">' + eventDate + '</div>';
+        html += '<div class="wcte-event-date">' + event.date + '</div>';
         html += '</div>'; // .wcte-event-details
         html += '</div>'; // .wcte-timeline-content
         html += '</div>'; // .wcte-timeline-event
