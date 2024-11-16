@@ -11,9 +11,21 @@ class WCTE_Database {
         // Initialize Firebase configuration
         self::$firebase_config = array(
             'apiKey' => get_option('wcte_firebase_api_key'),
-            'databaseURL' => get_option('wcte_firebase_database_url'),
+            'databaseURL' => 'https://rastreios-blazee-default-rtdb.firebaseio.com',
             'projectId' => get_option('wcte_firebase_project_id')
         );
+
+        self::log('Firebase config initialized', self::$firebase_config);
+    }
+
+    private static function log($message, $data = null) {
+        if (defined('WP_DEBUG') && WP_DEBUG === true) {
+            $log_message = 'WCTE Database: ' . $message;
+            if ($data !== null) {
+                $log_message .= ' - Data: ' . print_r($data, true);
+            }
+            error_log($log_message);
+        }
     }
 
     public static function install() {
@@ -31,22 +43,28 @@ class WCTE_Database {
      */
     public static function save_tracking_data($data) {
         try {
+            if (!self::$firebase_config) {
+                self::init();
+            }
+
             $url = self::$firebase_config['databaseURL'] . '/tracking/' . $data['tracking_code'] . '.json';
             $api_key = self::$firebase_config['apiKey'];
 
             if (empty($url) || empty($api_key)) {
-                error_log('WCTE Firebase - Missing configuration');
+                self::log('Missing configuration');
                 return false;
             }
 
             $url .= '?key=' . $api_key;
 
+            self::log('Saving tracking data to URL', $url);
+
             $tracking_data = array(
-                'woocommerce_order_id' => $data['woocommerce_order_id'],
-                'yampi_order_number' => $data['yampi_order_number'],
-                'email' => $data['email'],
+                'woocommerce_order_id' => $data['woocommerce_order_id'] ?? null,
+                'yampi_order_number' => $data['yampi_order_number'] ?? null,
+                'email' => $data['email'] ?? null,
                 'tracking_code' => $data['tracking_code'],
-                'carrier' => $data['carrier'],
+                'carrier' => $data['carrier'] ?? 'correios',
                 'tracking_status' => $data['tracking_status'] ?? 'pending',
                 'created_at' => date('Y-m-d H:i:s'),
                 'fake_updates' => array(),
@@ -59,16 +77,25 @@ class WCTE_Database {
                 'body' => json_encode($tracking_data)
             );
 
+            self::log('Request args', $args);
+
             $response = wp_remote_request($url, $args);
 
             if (is_wp_error($response)) {
-                error_log('WCTE Firebase - Error saving tracking data: ' . $response->get_error_message());
+                self::log('Error saving tracking data: ' . $response->get_error_message());
                 return false;
             }
 
-            return true;
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
+            self::log('Firebase response', array(
+                'code' => $response_code,
+                'body' => $response_body
+            ));
+
+            return $response_code === 200;
         } catch (Exception $e) {
-            error_log('WCTE Firebase - Exception: ' . $e->getMessage());
+            self::log('Exception: ' . $e->getMessage());
             return false;
         }
     }
@@ -78,6 +105,10 @@ class WCTE_Database {
      */
     public static function get_tracking_creation_date($tracking_code) {
         try {
+            if (!self::$firebase_config) {
+                self::init();
+            }
+
             $url = self::$firebase_config['databaseURL'] . '/tracking/' . $tracking_code . '/created_at.json';
             $api_key = self::$firebase_config['apiKey'];
 
@@ -87,18 +118,23 @@ class WCTE_Database {
 
             $url .= '?key=' . $api_key;
 
+            self::log('Getting creation date from URL', $url);
+
             $response = wp_remote_get($url);
 
             if (is_wp_error($response)) {
+                self::log('Error getting creation date: ' . $response->get_error_message());
                 return null;
             }
 
             $body = wp_remote_retrieve_body($response);
             $created_at = json_decode($body, true);
 
+            self::log('Creation date response', $created_at);
+
             return $created_at;
         } catch (Exception $e) {
-            error_log('WCTE Firebase - Exception: ' . $e->getMessage());
+            self::log('Exception: ' . $e->getMessage());
             return null;
         }
     }
@@ -108,6 +144,10 @@ class WCTE_Database {
      */
     public static function save_fake_update($tracking_code, $update_data) {
         try {
+            if (!self::$firebase_config) {
+                self::init();
+            }
+
             // First check if real tracking exists
             $has_real_tracking = self::get_tracking_status($tracking_code);
             if ($has_real_tracking === true) {
@@ -122,6 +162,8 @@ class WCTE_Database {
             }
 
             $url .= '?key=' . $api_key;
+
+            self::log('Saving fake update to URL', $url);
 
             // First get existing updates
             $response = wp_remote_get($url);
@@ -155,16 +197,25 @@ class WCTE_Database {
                 'body' => json_encode($existing_updates)
             );
 
+            self::log('Save fake update request', $args);
+
             $response = wp_remote_request($url, $args);
 
             if (is_wp_error($response)) {
-                error_log('WCTE Firebase - Error saving fake update: ' . $response->get_error_message());
+                self::log('Error saving fake update: ' . $response->get_error_message());
                 return false;
             }
 
-            return true;
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
+            self::log('Firebase response', array(
+                'code' => $response_code,
+                'body' => $response_body
+            ));
+
+            return $response_code === 200;
         } catch (Exception $e) {
-            error_log('WCTE Firebase - Exception: ' . $e->getMessage());
+            self::log('Exception: ' . $e->getMessage());
             return false;
         }
     }
@@ -174,6 +225,10 @@ class WCTE_Database {
      */
     public static function get_fake_updates($tracking_code) {
         try {
+            if (!self::$firebase_config) {
+                self::init();
+            }
+
             // First check if real tracking exists
             $has_real_tracking = self::get_tracking_status($tracking_code);
             if ($has_real_tracking === true) {
@@ -189,18 +244,23 @@ class WCTE_Database {
 
             $url .= '?key=' . $api_key;
 
+            self::log('Getting fake updates from URL', $url);
+
             $response = wp_remote_get($url);
 
             if (is_wp_error($response)) {
+                self::log('Error getting fake updates: ' . $response->get_error_message());
                 return array();
             }
 
             $body = wp_remote_retrieve_body($response);
             $updates = json_decode($body, true);
 
+            self::log('Fake updates response', $updates);
+
             return is_array($updates) ? $updates : array();
         } catch (Exception $e) {
-            error_log('WCTE Firebase - Exception: ' . $e->getMessage());
+            self::log('Exception: ' . $e->getMessage());
             return array();
         }
     }
@@ -210,6 +270,10 @@ class WCTE_Database {
      */
     public static function clear_fake_updates($tracking_code) {
         try {
+            if (!self::$firebase_config) {
+                self::init();
+            }
+
             $url = self::$firebase_config['databaseURL'] . '/tracking/' . $tracking_code . '.json';
             $api_key = self::$firebase_config['apiKey'];
 
@@ -218,6 +282,8 @@ class WCTE_Database {
             }
 
             $url .= '?key=' . $api_key;
+
+            self::log('Clearing fake updates at URL', $url);
 
             // Update tracking data to mark as having real tracking and clear fake updates
             $update_data = array(
@@ -231,16 +297,25 @@ class WCTE_Database {
                 'body' => json_encode($update_data)
             );
 
+            self::log('Clear fake updates request', $args);
+
             $response = wp_remote_request($url, $args);
 
             if (is_wp_error($response)) {
-                error_log('WCTE Firebase - Error clearing fake updates: ' . $response->get_error_message());
+                self::log('Error clearing fake updates: ' . $response->get_error_message());
                 return false;
             }
 
-            return true;
+            $response_code = wp_remote_retrieve_response_code($response);
+            $response_body = wp_remote_retrieve_body($response);
+            self::log('Firebase response', array(
+                'code' => $response_code,
+                'body' => $response_body
+            ));
+
+            return $response_code === 200;
         } catch (Exception $e) {
-            error_log('WCTE Firebase - Exception: ' . $e->getMessage());
+            self::log('Exception: ' . $e->getMessage());
             return false;
         }
     }
@@ -250,6 +325,10 @@ class WCTE_Database {
      */
     public static function get_tracking_status($tracking_code) {
         try {
+            if (!self::$firebase_config) {
+                self::init();
+            }
+
             $url = self::$firebase_config['databaseURL'] . '/tracking/' . $tracking_code . '/has_real_tracking.json';
             $api_key = self::$firebase_config['apiKey'];
 
@@ -259,18 +338,23 @@ class WCTE_Database {
 
             $url .= '?key=' . $api_key;
 
+            self::log('Getting tracking status from URL', $url);
+
             $response = wp_remote_get($url);
 
             if (is_wp_error($response)) {
+                self::log('Error getting tracking status: ' . $response->get_error_message());
                 return false;
             }
 
             $body = wp_remote_retrieve_body($response);
             $has_real_tracking = json_decode($body, true);
 
+            self::log('Tracking status response', $has_real_tracking);
+
             return $has_real_tracking === true;
         } catch (Exception $e) {
-            error_log('WCTE Firebase - Exception: ' . $e->getMessage());
+            self::log('Exception: ' . $e->getMessage());
             return false;
         }
     }
