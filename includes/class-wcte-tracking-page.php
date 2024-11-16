@@ -90,7 +90,7 @@ class WCTE_Tracking_Page {
 
                     if (empty($tracking_codes)) {
                         error_log('WCTE - Nenhum código de rastreamento encontrado nas notas do pedido');
-                        wp_send_json_error('Nenhum código de rastreamento encontrado para este pedido.');
+                        wp_send_json_error('Seu pedido está em processamento.');
                         return;
                     }
 

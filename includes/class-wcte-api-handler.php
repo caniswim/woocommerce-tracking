@@ -23,29 +23,81 @@ class WCTE_API_Handler {
     }
 
     /**
+     * Initialize tracking data in Firebase
+     */
+    private static function initialize_tracking($tracking_code) {
+        $tracking_data = array(
+            'tracking_code' => $tracking_code,
+            'carrier' => 'correios',
+            'tracking_status' => 'pending',
+            'created_at' => date('Y-m-d H:i:s'),
+            'has_real_tracking' => false
+        );
+
+        // Save initial tracking data
+        if (WCTE_Database::save_tracking_data($tracking_data)) {
+            // Generate first fictional message
+            $fictitious_message = self::get_fictitious_message($tracking_code);
+            if ($fictitious_message) {
+                $update_data = array(
+                    'message' => $fictitious_message,
+                    'timestamp' => time()
+                );
+                WCTE_Database::save_fake_update($tracking_code, $update_data);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    /**
      * Obtém informações de rastreamento
      */
     public static function get_tracking_info($tracking_code) {
         self::log('Iniciando consulta para código: ' . $tracking_code);
+
+        // Check if tracking exists in Firebase, if not initialize it
+        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
+        if (!$creation_date) {
+            self::initialize_tracking($tracking_code);
+        }
 
         if (preg_match('/^(LP|CN)/i', $tracking_code)) {
             return self::get_cainiao_tracking_info($tracking_code);
         } else {
             $tracking_info = self::get_correios_tracking_info($tracking_code);
             
-            // Only merge fake updates if we don't have real tracking data
+            // Only use fake updates if we don't have real tracking data
             if ($tracking_info['status'] === 'error' || empty($tracking_info['data'])) {
                 $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
                 if (!empty($fake_updates)) {
-                    $formatted_fake_updates = WCTE_Database::format_fake_updates($fake_updates);
+                    $formatted_updates = WCTE_Database::format_fake_updates($fake_updates);
                     return array(
                         'status' => 'in_transit',
-                        'message' => end($formatted_fake_updates)['description'],
-                        'data' => $formatted_fake_updates
+                        'message' => end($formatted_updates)['description'],
+                        'data' => $formatted_updates
                     );
                 }
+
+                // If no updates yet, generate first one
+                if (self::should_generate_fictional_update($tracking_code)) {
+                    $fictitious_message = self::get_fictitious_message($tracking_code);
+                    if ($fictitious_message) {
+                        $update_data = array(
+                            'message' => $fictitious_message,
+                            'timestamp' => time()
+                        );
+                        WCTE_Database::save_fake_update($tracking_code, $update_data);
+                        
+                        return array(
+                            'status' => 'in_transit',
+                            'message' => $fictitious_message,
+                            'data' => WCTE_Database::format_fake_updates(array($update_data))
+                        );
+                    }
+                }
             } else {
-                // If we have real tracking data, check if we should clear fictional updates
+                // If we have real tracking data, clear fictional updates
                 self::maybe_clear_fictional_updates($tracking_code);
             }
             
@@ -57,13 +109,12 @@ class WCTE_API_Handler {
      * Clear fictional updates when real tracking begins
      */
     private static function maybe_clear_fictional_updates($tracking_code) {
-        $tracking_status = get_post_meta($tracking_code, '_wcte_tracking_status', true);
+        $tracking_status = WCTE_Database::get_tracking_status($tracking_code);
         
         // If we haven't marked this tracking as having real data yet
-        if ($tracking_status !== 'real') {
+        if (!$tracking_status) {
             // Clear fictional updates and mark as having real data
             WCTE_Database::clear_fake_updates($tracking_code);
-            update_post_meta($tracking_code, '_wcte_tracking_status', 'real');
         }
     }
 
@@ -174,33 +225,9 @@ class WCTE_API_Handler {
         $data = json_decode($body, true);
 
         if ($status_code !== 200 || empty($data['objetos']) || empty($data['objetos'][0]['eventos'])) {
-            // Check if we should generate a new fictional update
-            if (self::should_generate_fictional_update($tracking_code)) {
-                $fictitious_message = self::get_fictitious_message($tracking_code);
-                if ($fictitious_message) {
-                    $update_data = array(
-                        'message' => $fictitious_message,
-                        'timestamp' => time()
-                    );
-                    WCTE_Database::save_fake_update($tracking_code, $update_data);
-                }
-            }
-
-            // Get all fake updates
-            $fake_updates = WCTE_Database::get_fake_updates($tracking_code);
-            if (!empty($fake_updates)) {
-                $formatted_updates = WCTE_Database::format_fake_updates($fake_updates);
-                return array(
-                    'status' => 'in_transit',
-                    'message' => end($formatted_updates)['description'],
-                    'data' => $formatted_updates
-                );
-            }
-
             return array(
-                'status' => 'pending',
-                'message' => 'Aguardando informações de rastreamento',
-                'data' => array()
+                'status' => 'error',
+                'message' => 'Aguardando informações dos Correios'
             );
         }
 
@@ -252,10 +279,10 @@ class WCTE_API_Handler {
      * Verifica se devemos gerar uma nova atualização fictícia
      */
     private static function should_generate_fictional_update($tracking_code) {
-        $tracking_status = get_post_meta($tracking_code, '_wcte_tracking_status', true);
+        $tracking_status = WCTE_Database::get_tracking_status($tracking_code);
         
         // Don't generate if we already have real tracking data
-        if ($tracking_status === 'real') {
+        if ($tracking_status) {
             return false;
         }
 
@@ -272,7 +299,7 @@ class WCTE_API_Handler {
         $creation_timestamp = strtotime($creation_date);
 
         foreach ($messages as $message_data) {
-            if (empty($message_data['message']) || empty($message_data['days']) || empty($message_data['hour'])) {
+            if (empty($message_data['message']) || !isset($message_data['days']) || empty($message_data['hour'])) {
                 continue;
             }
 
@@ -310,13 +337,21 @@ class WCTE_API_Handler {
 
         $now = current_time('timestamp');
         $current_message = null;
+        $earliest_valid_message = null;
+        $earliest_valid_time = PHP_INT_MAX;
 
         foreach ($messages as $message_data) {
-            if (empty($message_data['message']) || empty($message_data['days']) || empty($message_data['hour'])) {
+            if (empty($message_data['message']) || !isset($message_data['days']) || empty($message_data['hour'])) {
                 continue;
             }
 
             $scheduled_time = strtotime($creation_date . ' +' . intval($message_data['days']) . ' days ' . $message_data['hour']);
+
+            // Track the earliest valid message
+            if ($scheduled_time < $earliest_valid_time) {
+                $earliest_valid_time = $scheduled_time;
+                $earliest_valid_message = $message_data['message'];
+            }
 
             if ($now >= $scheduled_time) {
                 // Check if this message has already been used
@@ -335,7 +370,12 @@ class WCTE_API_Handler {
             }
         }
 
-        return $current_message;
+        // If no current message is found but we have a valid earliest message
+        if ($current_message === null && $earliest_valid_message !== null) {
+            $current_message = $earliest_valid_message;
+        }
+
+        return $current_message ?: 'Seu pedido está em processamento.';
     }
 
     /**
