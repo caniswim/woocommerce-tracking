@@ -364,18 +364,24 @@ class WCTE_Database {
     public static function format_fake_updates($fake_updates) {
         $formatted_updates = array();
         foreach ($fake_updates as $update) {
-            // Verifica se existe o campo datetime ou date nas atualizações novas
+            // Converte a data para o formato dos Correios (dd/mm/yyyy HH:ii)
             if (isset($update['datetime'])) {
-                $date = $update['datetime'];
+                $date = DateTime::createFromFormat('Y-m-d H:i:s', $update['datetime']);
             } elseif (isset($update['date'])) {
-                $date = $update['date'];
+                $date = DateTime::createFromFormat('Y-m-d H:i:s', $update['date']);
             } else {
-                // Fallback para o formato antigo usando timestamp
-                $date = date('d/m/Y H:i', $update['timestamp']);
+                $date = new DateTime();
+                $date->setTimestamp($update['timestamp']);
+            }
+            
+            if ($date) {
+                $formatted_date = $date->format('d/m/Y H:i');
+            } else {
+                $formatted_date = date('d/m/Y H:i');
             }
 
             $formatted_updates[] = array(
-                'date' => $date,
+                'date' => $formatted_date,
                 'description' => $update['message'],
                 'location' => 'Brasil'
             );

@@ -108,12 +108,12 @@ jQuery(document).ready(function($) {
             } else if (result.data && result.data.length > 0) {
                 htmlContent += '<div class="wcte-timeline">';
                 
-                // Show first 3 events initially (now the most recent ones)
+                // Os primeiros 3 eventos já serão os mais recentes
                 result.data.slice(0, 3).forEach(function(event, index) {
                     htmlContent += renderTimelineEvent(event, index === 0);
                 });
 
-                // Add hidden events
+                // Eventos ocultos também mantêm a ordem cronológica
                 if (result.data.length > 3) {
                     htmlContent += '<div class="wcte-hidden-events" style="display: none;">';
                     result.data.slice(3).forEach(function(event) {
@@ -185,7 +185,7 @@ jQuery(document).ready(function($) {
         if (event.location) {
             html += '<div class="wcte-event-location">' + event.location + '</div>';
         }
-        html += '<div class="wcte-event-date">' + event.movement_date + '</div>'; // Changed from event.date to event.movement_date
+        html += '<div class="wcte-event-date">' + event.date + '</div>';
         html += '</div>'; // .wcte-event-details
         html += '</div>'; // .wcte-timeline-content
         html += '</div>'; // .wcte-timeline-event

@@ -293,10 +293,10 @@ class WCTE_API_Handler {
                 if (!empty($fake_updates)) {
                     $formatted_fake_updates = WCTE_Database::format_fake_updates($fake_updates);
                     
-                    // Ordena todas as atualizações por data
+                    // Ordena todas as atualizações por data (do mais recente para o mais antigo)
                     $all_updates = array_merge($formatted_fake_updates, $tracking_info['data']);
                     usort($all_updates, function($a, $b) {
-                        return strtotime(str_replace('/', '-', $a['date'])) - strtotime(str_replace('/', '-', $b['date']));
+                        return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
                     });
                     
                     $tracking_info['data'] = $all_updates;
@@ -358,7 +358,7 @@ class WCTE_API_Handler {
             );
         }
 
-        $events = array_reverse($objeto['eventos']);
+        $events = $objeto['eventos'];
         $filtered_events = array();
         $timezone = self::get_timezone();
 
@@ -377,11 +377,14 @@ class WCTE_API_Handler {
             $event_date->setTimezone($timezone);
 
             $filtered_events[] = array(
-                'date' => $event_date->format('d/m/Y H:i'),
+                'date' => $event_date->format('d/m/Y H:i'), // Formato consistente dd/mm/yyyy HH:ii
                 'description' => $event['descricao'],
                 'location' => $location
             );
         }
+
+        // Inverte a ordem dos eventos para mostrar do mais recente para o mais antigo
+        $filtered_events = array_reverse($filtered_events);
 
         $last_event = reset($filtered_events);
         $status = 'in_transit';
