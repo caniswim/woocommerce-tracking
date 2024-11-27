@@ -85,10 +85,10 @@ class WCTE_Tracking_Page {
                 $order = wc_get_order($order_id);
 
                 if ($order) {
-                    $tracking_codes = $this->get_tracking_codes_from_order($order);
-                    error_log('WCTE - Códigos encontrados no pedido: ' . print_r($tracking_codes, true));
+                    $tracking_data = $this->get_tracking_codes_from_order($order);
+                    error_log('WCTE - Códigos encontrados no pedido: ' . print_r($tracking_data, true));
 
-                    if (empty($tracking_codes)) {
+                    if (empty($tracking_data)) {
                         error_log('WCTE - Nenhum código de rastreamento encontrado nas notas do pedido');
                         wp_send_json_error('Seu pedido está em processamento.');
                         return;
@@ -106,13 +106,13 @@ class WCTE_Tracking_Page {
                 }
             } else {
                 error_log('WCTE - Processando código de rastreio direto: ' . $tracking_input);
-                $tracking_codes = array($tracking_input);
+                $tracking_data = array($tracking_input => date('Y-m-d H:i:s'));
             }
 
             $results = array();
-            foreach ($tracking_codes as $code) {
-                error_log('WCTE - Consultando código: ' . $code);
-                $tracking_info = $this->api_handler->get_tracking_info($code);
+            foreach ($tracking_data as $code => $note_date) {
+                error_log('WCTE - Consultando código: ' . $code . ' com data da nota: ' . $note_date);
+                $tracking_info = $this->api_handler->get_tracking_info($code, $note_date);
 
                 if ($tracking_info) {
                     error_log('WCTE - Informações obtidas para ' . $code . ': ' . print_r($tracking_info, true));
@@ -158,27 +158,23 @@ class WCTE_Tracking_Page {
 
 private function get_tracking_codes_from_order($order) {
     try {
-        $tracking_codes = array();
+        $tracking_data = array();
 
-        // Obtém todas as notas do pedido
         $order_notes = wc_get_order_notes(array(
             'order_id' => $order->get_id(),
-            'type' => 'any', // Inclui todos os tipos de notas
+            'type' => 'any',
         ));
 
-        // Expressão regular para capturar os códigos de rastreamento
         foreach ($order_notes as $note) {
             if (preg_match_all('/\b([A-Z]{2}[0-9]{9,14}[A-Z]{2})\b|\b(LP\d{12,})\b|\b(CNBR\d{8,})\b|\b(YT\d{16})\b/i', $note->content, $matches)) {
-                $tracking_codes = array_merge($tracking_codes, $matches[0]); // Captura todas as correspondências
+                foreach ($matches[0] as $code) {
+                    $tracking_data[$code] = $note->date_created->date('Y-m-d H:i:s');
+                }
             }
         }
 
-        // Remove duplicatas dos códigos de rastreamento, caso existam
-        $tracking_codes = array_unique($tracking_codes);
-        error_log('WCTE - Códigos encontrados nas notas: ' . print_r($tracking_codes, true));
-
-        return $tracking_codes;
-
+        error_log('WCTE - Códigos e datas encontrados nas notas: ' . print_r($tracking_data, true));
+        return $tracking_data;
     } catch (Exception $e) {
         error_log('WCTE - Erro ao buscar códigos do pedido: ' . $e->getMessage());
         return array();

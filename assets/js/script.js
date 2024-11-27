@@ -19,7 +19,19 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    renderTrackingResults(response.data);
+                    if (response.data.tracking_results && 
+                        response.data.tracking_results[0] && 
+                        response.data.tracking_results[0].status === 'orders_found') {
+                        
+                        renderOrderList({
+                            status: 'orders_found',
+                            data: response.data.tracking_results[0].data
+                        });
+                    } else if (response.data.status === 'no_orders') {
+                        $('#wcte-tracking-results').html('<p>' + response.data.message + '</p>');
+                    } else {
+                        renderTrackingResults(response.data);
+                    }
                     // Update URL with tracking input for sharing
                     const newUrl = new URL(window.location);
                     newUrl.searchParams.set('tracking_input', trackingInput);
@@ -34,10 +46,52 @@ jQuery(document).ready(function($) {
         });
     }
 
+    function isValidInput(input) {
+        // Remove espaços em branco no início e fim
+        input = input.trim();
+        
+        // Verifica se é um email
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (emailRegex.test(input)) {
+            return true;
+        }
+
+        // Verifica se é um número de pedido (com ou sem #)
+        const orderNumberRegex = /^#?\d+$/;
+        if (orderNumberRegex.test(input)) {
+            return true;
+        }
+
+        return false;
+    }
+
     $('#wcte-form').on('submit', function(e) {
         e.preventDefault();
-        var trackingInput = $('#tracking_input').val();
+        var trackingInput = $('#tracking_input').val().trim();
+        
+        if (!isValidInput(trackingInput)) {
+            $('#wcte-tracking-results').html('<p class="error">Por favor, insira um número de pedido válido ou um endereço de email.</p>');
+            return;
+        }
+        
+        // Remove o # se existir antes de enviar
+        if (trackingInput.startsWith('#')) {
+            trackingInput = trackingInput.substring(1);
+        }
+        
         initiateTracking(trackingInput);
+    });
+
+    // Validação em tempo real no input
+    $('#tracking_input').on('input', function() {
+        var input = $(this).val().trim();
+        if (input && !isValidInput(input)) {
+            $(this).addClass('invalid');
+            $('#wcte-tracking-results').html('<p class="error">Por favor, insira um número de pedido válido ou um endereço de email.</p>');
+        } else {
+            $(this).removeClass('invalid');
+            $('#wcte-tracking-results').empty();
+        }
     });
 
     var trackingInputFromUrl = getUrlParameter('tracking_input');
@@ -190,5 +244,40 @@ jQuery(document).ready(function($) {
         html += '</div>'; // .wcte-timeline-content
         html += '</div>'; // .wcte-timeline-event
         return html;
+    }
+
+    function renderOrderList(data) {
+        var htmlContent = '<div class="wcte-tracking-container">';
+        htmlContent += '<div class="wcte-other-orders">';
+        htmlContent += '<h3>Pedidos encontrados</h3>';
+        htmlContent += '<div class="wcte-orders-list">';
+        
+        data.data.forEach(function(order) {
+            // Formata a data para mostrar apenas dd/mm/yyyy
+            const orderDate = order.order_date.split(' ')[0];
+            
+            htmlContent += '<div class="wcte-other-order-item" data-order="' + order.order_id + '">';
+            htmlContent += '<span class="wcte-order-number">Pedido #' + order.order_id + '</span>';
+            htmlContent += '<span class="wcte-order-date">' + orderDate + '</span>';
+            htmlContent += '</div>';
+        });
+        
+        htmlContent += '</div>'; // .wcte-orders-list
+        htmlContent += '</div>'; // .wcte-other-orders
+        htmlContent += '</div>'; // .wcte-tracking-container
+
+        $('#wcte-tracking-results').html(htmlContent);
+
+        // Faz os pedidos serem clicáveis
+        $('.wcte-other-order-item').on('click', function() {
+            var orderNumber = $(this).data('order');
+            $('#tracking_input').val(orderNumber);
+            initiateTracking(orderNumber);
+            
+            // Rolagem suave para o topo
+            $('html, body').animate({
+                scrollTop: $('#wcte-form').offset().top
+            }, 500);
+        });
     }
 });
