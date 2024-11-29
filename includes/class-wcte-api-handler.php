@@ -277,30 +277,35 @@ public static function get_fictitious_messages_by_order_date($order_date) {
     $current_time = self::get_current_time();
     $valid_messages = array();
 
-    foreach ($fictitious_messages as $msg) {
-        $msg_date = strtotime(str_replace('/', '-', $msg['date']));
-    
-        // Ignora mensagens fictícias com data igual ou posterior a uma atualização real
-        $should_skip = false;
-        if ($has_real_data) {
-            foreach ($real_events as $real_update) {
-                $real_date = strtotime(str_replace('/', '-', $real_update['date']));
-                if ($real_date <= $msg_date) {
-                    $should_skip = true;
-                    break;
-                }
+    foreach ($messages as $message_data) {
+        if (
+            empty($message_data['message']) ||
+            !isset($message_data['days']) ||
+            !isset($message_data['hour'])
+        ) {
+            continue; // Pula mensagens inválidas
+        }
+
+        // Verifica se a mensagem se aplica a pedidos sem rastreio
+        if (isset($message_data['applies_to'])) {
+            if ($message_data['applies_to'] === 'with_tracking') {
+                continue; // Ignora mensagens destinadas apenas a pedidos com rastreio
             }
+            // Inclui mensagens com 'both' ou 'without_tracking'
         }
-    
-        if (!$should_skip) {
-            $formatted_fictitious_updates[] = array(
-                'date' => $msg['date'],
-                'description' => $msg['message'],
-                'location' => 'Brasil'
-            );
+
+        $scheduled_time = self::get_scheduled_message_time($order_date, $message_data['days'], $message_data['hour']);
+
+        if ($scheduled_time > $current_time) {
+            continue; // Pula mensagens futuras
         }
+
+        $valid_messages[] = array(
+            'date' => date('d/m/Y H:i', $scheduled_time),
+            'description' => $message_data['message'],
+            'location' => 'Brasil',
+        );
     }
-    
 
     usort($valid_messages, function ($a, $b) {
         return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
@@ -308,6 +313,7 @@ public static function get_fictitious_messages_by_order_date($order_date) {
 
     return $valid_messages;
 }
+
 
 
 
