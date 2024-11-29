@@ -279,19 +279,21 @@ class WCTE_Admin_Settings {
         if (!is_array($input)) {
             return array();
         }
-
+    
         $sanitized = array();
         foreach ($input as $key => $msg) {
             if (isset($msg['message']) || isset($msg['days']) || isset($msg['hour'])) {
                 $sanitized[$key] = array(
                     'message' => sanitize_text_field($msg['message']),
                     'days' => absint($msg['days']),
-                    'hour' => sanitize_text_field($msg['hour'])
+                    'hour' => sanitize_text_field($msg['hour']),
+                    'applies_to' => isset($msg['applies_to']) ? sanitize_text_field($msg['applies_to']) : 'both',
                 );
             }
         }
         return $sanitized;
     }
+    
 
     // Callbacks dos campos dos Correios
     public function api_key_field_callback() {
@@ -471,19 +473,27 @@ class WCTE_Admin_Settings {
                             <th>Mensagem</th>
                             <th>Dias após o envio</th>
                             <th>Hora</th>
+                            <th>Aplica-se a</th> <!-- Nova coluna -->
                         </tr>
                     </thead>
                     <tbody>
                         <?php
                         $messages = get_option('wcte_fictitious_messages', array());
                         for ($i = 0; $i < 12; $i++) {
-                            $msg = isset($messages[$i]) ? $messages[$i] : array('message' => '', 'days' => '', 'hour' => '');
+                            $msg = isset($messages[$i]) ? $messages[$i] : array('message' => '', 'days' => '', 'hour' => '', 'applies_to' => 'both');
                             ?>
                             <tr>
                                 <td><?php echo ($i + 1); ?></td>
                                 <td><input type="text" name="wcte_fictitious_messages[<?php echo $i; ?>][message]" value="<?php echo esc_attr($msg['message']); ?>" class="regular-text" /></td>
                                 <td><input type="number" name="wcte_fictitious_messages[<?php echo $i; ?>][days]" value="<?php echo esc_attr($msg['days']); ?>" min="0" class="small-text" /></td>
                                 <td><input type="time" name="wcte_fictitious_messages[<?php echo $i; ?>][hour]" value="<?php echo esc_attr($msg['hour']); ?>" /></td>
+                                <td>
+                                    <select name="wcte_fictitious_messages[<?php echo $i; ?>][applies_to]">
+                                        <option value="both" <?php selected($msg['applies_to'], 'both'); ?>>Ambos</option>
+                                        <option value="with_tracking" <?php selected($msg['applies_to'], 'with_tracking'); ?>>Com Rastreamento</option>
+                                        <option value="without_tracking" <?php selected($msg['applies_to'], 'without_tracking'); ?>>Sem Rastreamento</option>
+                                    </select>
+                                </td>
                             </tr>
                             <?php
                         }
@@ -496,6 +506,7 @@ class WCTE_Admin_Settings {
         </div>
         <?php
     }
+    
 }
 
 // Inicializa a classe de configurações

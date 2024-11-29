@@ -201,51 +201,49 @@ class WCTE_API_Handler {
 private static function get_fictitious_message($tracking_code) {
     $messages = get_option('wcte_fictitious_messages', array());
     $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
-    $current_time = self::get_current_time();
-
-    if (!$creation_date) {
-        return array(
-            array(
-                'date' => self::get_current_datetime(),
-                'hour' => date('H:i', $current_time),
-                'message' => 'Seu pedido está em processamento.'
-            )
-        );
-    }
-
-    // Obtém a data/hora da nota do pedido do log
     global $wcte_order_note_date;
     $base_date = $wcte_order_note_date ?: $creation_date;
 
     $valid_messages = array();
+    $current_time = self::get_current_time();
 
     foreach ($messages as $message_data) {
         if (empty($message_data['message']) || !isset($message_data['days']) || empty($message_data['hour'])) {
             continue;
         }
 
-        // Usa a data da nota como base para calcular o horário
+        // Adiciona a verificação do 'applies_to'
+        if (isset($message_data['applies_to'])) {
+            if ($message_data['applies_to'] === 'without_tracking') {
+                continue; // Ignora mensagens destinadas apenas a pedidos sem rastreio
+            }
+            // Inclui mensagens com 'both' ou 'with_tracking'
+        }
+
+        // Calcula o horário agendado da mensagem
         $scheduled_time = self::get_scheduled_message_time($base_date, $message_data['days'], $message_data['hour']);
-        
-        // Verifica se a data programada é futura
         if ($scheduled_time > $current_time) {
-            continue; // Pula mensagens com data futura
+            continue; // Ignora mensagens futuras
         }
 
         $valid_messages[] = array(
             'date' => date('d/m/Y H:i', $scheduled_time),
-            'hour' => $message_data['hour'],
             'message' => $message_data['message']
         );
     }
 
-    // Ordena as mensagens por data
+    // Ordena mensagens por data
     usort($valid_messages, function($a, $b) {
         return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
     });
 
     return $valid_messages;
 }
+
+
+
+
+
 
     /**
      * Verifica se a entrada é um email
@@ -267,70 +265,95 @@ private static function get_fictitious_message($tracking_code) {
         return $orders;
     }
 
-    /**
-     * Obtém informações de rastreamento ou pedidos
-     */
-    public static function get_tracking_info($tracking_code_or_email, $order_note_date = null) {
-        self::log('Iniciando consulta para: ' . $tracking_code_or_email);
 
-        // Verifica se a entrada é um email
-        if (self::is_email($tracking_code_or_email)) {
-            // Busca pedidos associados ao email
-            $orders = self::get_orders_by_email($tracking_code_or_email);
-            if (!empty($orders)) {
-                // Prepara os dados dos pedidos para exibição
-                $order_list = array();
-                foreach ($orders as $order) {
-                    $order_list[] = array(
-                        'order_id' => $order->get_id(),
-                        'order_date' => $order->get_date_created()->date('d/m/Y H:i'),
-                        'order_status' => wc_get_order_status_name($order->get_status()),
-                        'tracking_code' => $order->get_meta('_tracking_code'),
-                    );
+    /**
+     * Generate fictitious messages using the order creation date
+     */
+/**
+ * Gera mensagens fictícias usando a data de criação do pedido
+ */
+public static function get_fictitious_messages_by_order_date($order_date) {
+    $messages = get_option('wcte_fictitious_messages', array());
+    $current_time = self::get_current_time();
+    $valid_messages = array();
+
+    foreach ($fictitious_messages as $msg) {
+        $msg_date = strtotime(str_replace('/', '-', $msg['date']));
+    
+        // Ignora mensagens fictícias com data igual ou posterior a uma atualização real
+        $should_skip = false;
+        if ($has_real_data) {
+            foreach ($real_events as $real_update) {
+                $real_date = strtotime(str_replace('/', '-', $real_update['date']));
+                if ($real_date <= $msg_date) {
+                    $should_skip = true;
+                    break;
                 }
-                return array(
-                    'status' => 'orders_found',
-                    'message' => 'Pedidos encontrados para o email.',
-                    'data' => $order_list,
-                );
-            } else {
-                return array(
-                    'status' => 'no_orders',
-                    'message' => 'Nenhum pedido encontrado para este email.',
-                );
             }
         }
+    
+        if (!$should_skip) {
+            $formatted_fictitious_updates[] = array(
+                'date' => $msg['date'],
+                'description' => $msg['message'],
+                'location' => 'Brasil'
+            );
+        }
+    }
+    
 
-        // Continua com o processamento existente para código de rastreamento
+    usort($valid_messages, function ($a, $b) {
+        return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
+    });
+
+    return $valid_messages;
+}
+
+
+
+
+
+    /**
+     * Get tracking info by code
+     */
+    public static function get_tracking_info_by_code($tracking_code, $order_note_date = null) {
         global $wcte_order_note_date;
         $wcte_order_note_date = $order_note_date;
-
-        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code_or_email);
+    
+        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
         if (!$creation_date) {
-            self::initialize_tracking($tracking_code_or_email, $order_note_date);
+            self::initialize_tracking($tracking_code, $order_note_date);
         }
-
-        // Primeiramente, tenta obter informações reais dos Correios
-        $tracking_info = self::get_correios_tracking_info($tracking_code_or_email);
-        $has_real_data = ($tracking_info['status'] !== 'error' && !empty($tracking_info['data']));
-
-        // Se encontrou dados reais, marca como tendo rastreio real
+    
+        // Obtém informações reais de rastreamento dos Correios
+        $tracking_info = self::get_correios_tracking_info($tracking_code);
+    
+        $has_real_data = false;
+        $real_events = array();
+        if ($tracking_info['status'] !== 'error' && !empty($tracking_info['data'])) {
+            foreach ($tracking_info['data'] as $event) {
+                $has_real_data = true;
+                $real_events[] = $event;
+            }
+        }
+    
+        // Marca como tendo rastreamento real se houver atualizações reais
         if ($has_real_data) {
-            WCTE_Database::mark_as_real_tracking($tracking_code_or_email);
+            WCTE_Database::mark_as_real_tracking($tracking_code);
         }
-
+    
         // Obtém mensagens fictícias
-        $fictitious_messages = self::get_fictitious_message($tracking_code_or_email);
-
-        // Formata mensagens fictícias como atualizações de rastreamento
+        $fictitious_messages = self::get_fictitious_message($tracking_code);
+    
+        // Formata as mensagens fictícias
         $formatted_fictitious_updates = array();
         foreach ($fictitious_messages as $msg) {
             $msg_date = strtotime(str_replace('/', '-', $msg['date']));
-            
-            // Verifica se existe alguma atualização real dos Correios nesta data ou depois
+    
+            // Ignora mensagens fictícias com data igual ou posterior a uma atualização real
             $should_skip = false;
             if ($has_real_data) {
-                foreach ($tracking_info['data'] as $real_update) {
+                foreach ($real_events as $real_update) {
                     $real_date = strtotime(str_replace('/', '-', $real_update['date']));
                     if ($real_date <= $msg_date) {
                         $should_skip = true;
@@ -338,7 +361,7 @@ private static function get_fictitious_message($tracking_code) {
                     }
                 }
             }
-
+    
             if (!$should_skip) {
                 $formatted_fictitious_updates[] = array(
                     'date' => $msg['date'],
@@ -347,26 +370,92 @@ private static function get_fictitious_message($tracking_code) {
                 );
             }
         }
-
-        // Se há dados reais, combina com as mensagens fictícias
+    
+        // Combina as mensagens fictícias com as reais
         if ($has_real_data) {
             $all_updates = array_merge($formatted_fictitious_updates, $tracking_info['data']);
             usort($all_updates, function ($a, $b) {
                 return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
             });
-
+    
             $tracking_info['data'] = $all_updates;
+            $tracking_info['tracking_code'] = $tracking_code;
             return $tracking_info;
         }
-
-        // Caso não haja dados reais, retorna apenas as mensagens fictícias
+    
+        // Se não houver dados reais, retorna apenas as mensagens fictícias
         return array(
             'status' => 'in_transit',
             'message' => end($formatted_fictitious_updates)['description'],
             'data' => $formatted_fictitious_updates,
+            'tracking_code' => $tracking_code
+        );
+    }
+    
+    
+
+    
+
+    /**
+     * Obtém informações de rastreamento ou pedidos
+     */
+    public static function get_tracking_info($tracking_code_or_email, $order_note_date = null) {
+        self::log('Iniciando consulta para: ' . $tracking_code_or_email);
+    
+        global $wcte_order_note_date;
+        $wcte_order_note_date = $order_note_date;
+    
+        // Obtém a data de criação do rastreamento
+        $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code_or_email);
+        if (!$creation_date) {
+            self::initialize_tracking($tracking_code_or_email, $order_note_date);
+            $creation_date = $order_note_date;
+        }
+    
+        // Obtém mensagens reais dos Correios
+        $tracking_info = self::get_correios_tracking_info($tracking_code_or_email);
+        $has_real_data = ($tracking_info['status'] !== 'error' && !empty($tracking_info['data']));
+    
+        // Marca como rastreamento real se houver dados reais
+        if ($has_real_data) {
+            WCTE_Database::mark_as_real_tracking($tracking_code_or_email);
+        }
+    
+        // Obtém mensagens fictícias
+        $fictitious_messages = self::get_fictitious_message($tracking_code_or_email);
+    
+        // Formata mensagens fictícias para exibição
+        $formatted_fictitious_updates = array();
+        foreach ($fictitious_messages as $msg) {
+            $formatted_fictitious_updates[] = array(
+                'date' => $msg['date'],
+                'description' => $msg['message'],
+                'location' => 'Brasil'
+            );
+        }
+    
+        // Combina mensagens reais e fictícias
+        $all_updates = array_merge($formatted_fictitious_updates, $tracking_info['data'] ?? []);
+        usort($all_updates, function ($a, $b) {
+            return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
+        });
+    
+        // Atualiza informações de rastreamento
+        return array(
+            'status' => $tracking_info['status'] ?? 'in_transit',
+            'message' => end($all_updates)['description'] ?? 'Seu pedido está em processamento.',
+            'data' => $all_updates,
             'tracking_code' => $tracking_code_or_email
         );
     }
+    
+    
+    
+    
+    
+
+    
+
 
     /**
      * Obtém informações de rastreamento dos Correios
