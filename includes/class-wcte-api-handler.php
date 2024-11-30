@@ -226,14 +226,19 @@ private static function get_fictitious_message($tracking_code) {
             continue; // Ignora mensagens futuras
         }
 
+        // Formata a data com o fuso horário correto
+        $date = new DateTime('@' . $scheduled_time); // Cria DateTime a partir do timestamp
+        $date->setTimezone(self::get_timezone()); // Define o fuso horário para São Paulo
+        $formatted_date = $date->format('d/m/Y H:i');
+
         $valid_messages[] = array(
-            'date' => date('d/m/Y H:i', $scheduled_time),
+            'date' => $formatted_date,
             'message' => $message_data['message']
         );
     }
 
     // Ordena mensagens por data
-    usort($valid_messages, function($a, $b) {
+    usort($valid_messages, function ($a, $b) {
         return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
     });
 
@@ -300,13 +305,19 @@ public static function get_fictitious_messages_by_order_date($order_date) {
             continue; // Pula mensagens futuras
         }
 
+        // Formata a data com o fuso horário correto
+        $date = new DateTime('@' . $scheduled_time); // Cria DateTime a partir do timestamp
+        $date->setTimezone(self::get_timezone()); // Define o fuso horário para São Paulo
+        $formatted_date = $date->format('d/m/Y H:i');
+
         $valid_messages[] = array(
-            'date' => date('d/m/Y H:i', $scheduled_time),
+            'date' => $formatted_date,
             'description' => $message_data['message'],
             'location' => 'Brasil',
         );
     }
 
+    // Ordena mensagens por data
     usort($valid_messages, function ($a, $b) {
         return strtotime(str_replace('/', '-', $b['date'])) - strtotime(str_replace('/', '-', $a['date']));
     });
