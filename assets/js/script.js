@@ -101,23 +101,25 @@ jQuery(document).ready(function($) {
         var htmlContent = '<div class="wcte-tracking-container">';
     
         // Informações do Pedido
-        if (data.order_number) {
+        if (data.order_number && data.order_items) {
             htmlContent += '<div class="wcte-order-info">';
             htmlContent += '<h3>Pedido #' + data.order_number + '</h3>';
     
             // Itens do Pedido
-            if (data.order_items && data.order_items.length > 0) {
+            if (data.order_items.length > 0) {
                 htmlContent += '<div class="wcte-order-items">';
                 data.order_items.forEach(function(item) {
                     htmlContent += '<div class="wcte-order-item">';
-                    htmlContent += '<img src="' + item.image + '" alt="' + item.name + '">';
+                    if (item.image) {
+                        htmlContent += '<img src="' + item.image + '" alt="' + item.name + '">';
+                    }
                     htmlContent += '<span class="wcte-item-name">' + item.name + '</span>';
                     htmlContent += '</div>';
                 });
-                htmlContent += '</div>'; // .wcte-order-items
+                htmlContent += '</div>';
             }
     
-            htmlContent += '</div>'; // .wcte-order-info
+            htmlContent += '</div>';
         }
     
         // Aviso de Múltiplos Rastreamentos
@@ -140,13 +142,6 @@ jQuery(document).ready(function($) {
                     htmlContent += '</div>';
                 }
     
-                // Mensagem de Status
-                if (result.message) {
-                    htmlContent += '<div class="wcte-tracking-message">';
-                    htmlContent += '<p><strong>Status:</strong> ' + result.message + '</p>';
-                    htmlContent += '</div>';
-                }
-    
                 // Verifica se é rastreamento da Cainiao
                 if (result.status === 'cainiao') {
                     htmlContent += '<div class="wcte-cainiao-tracking">';
@@ -154,7 +149,7 @@ jQuery(document).ready(function($) {
                     htmlContent += '<a href="' + result.tracking_url + '" target="_blank" class="wcte-tracking-button">Rastrear no Site da Transportadora</a>';
                     htmlContent += '</div>';
                 }
-                // Renderiza a Linha do Tempo de Eventos
+                // Timeline de eventos
                 else if (result.data && result.data.length > 0) {
                     htmlContent += '<div class="wcte-timeline">';
     
@@ -173,31 +168,16 @@ jQuery(document).ready(function($) {
                         htmlContent += '<button class="wcte-show-more-button">Ver mais</button>';
                     }
     
-                    htmlContent += '</div>'; // .wcte-timeline
+                    htmlContent += '</div>';
                 }
     
-                htmlContent += '</div>'; // .wcte-tracking-info
+                htmlContent += '</div>';
             });
         } else {
             htmlContent += '<p>Seu pedido ainda não possui atualizações de rastreamento.</p>';
         }
     
-        // Outros Pedidos
-        if (data.other_orders && data.other_orders.length > 0) {
-            htmlContent += '<div class="wcte-other-orders">';
-            htmlContent += '<h3>Outros Pedidos</h3>';
-            htmlContent += '<div class="wcte-orders-list">';
-            data.other_orders.forEach(function(order) {
-                htmlContent += '<div class="wcte-other-order-item" data-order="' + order.order_number + '">';
-                htmlContent += '<span class="wcte-order-number">Pedido #' + order.order_number + '</span>';
-                htmlContent += '<span class="wcte-order-date">' + order.date + '</span>';
-                htmlContent += '</div>';
-            });
-            htmlContent += '</div>';
-            htmlContent += '</div>';
-        }
-    
-        htmlContent += '</div>'; // .wcte-tracking-container
+        htmlContent += '</div>';
     
         $('#wcte-tracking-results').html(htmlContent);
     
@@ -213,18 +193,6 @@ jQuery(document).ready(function($) {
                 $hiddenEvents.slideDown();
                 $button.text('Ver menos');
             }
-        });
-    
-        // Eventos para outros pedidos
-        $('.wcte-other-order-item').on('click', function() {
-            var orderNumber = $(this).data('order');
-            $('#tracking_input').val(orderNumber);
-            initiateTracking(orderNumber);
-    
-            // Rolagem suave para o topo
-            $('html, body').animate({
-                scrollTop: $('#wcte-form').offset().top
-            }, 500);
         });
     }
     
