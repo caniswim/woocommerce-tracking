@@ -199,6 +199,11 @@ class WCTE_API_Handler {
  * Obtém todas as mensagens fictícias programadas, independentemente do horário
  */
 private static function get_fictitious_message($tracking_code) {
+    // Retorna array vazio se for código Cainiao
+    if (self::is_cainiao_tracking($tracking_code)) {
+        return array();
+    }
+
     $messages = get_option('wcte_fictitious_messages', array());
     $creation_date = WCTE_Database::get_tracking_creation_date($tracking_code);
     global $wcte_order_note_date;
@@ -334,6 +339,17 @@ public static function get_fictitious_messages_by_order_date($order_date) {
      * Get tracking info by code
      */
     public static function get_tracking_info_by_code($tracking_code, $order_note_date = null) {
+        // Verifica se é código Cainiao logo no início
+        if (self::is_cainiao_tracking($tracking_code)) {
+            return array(
+                'status' => 'cainiao',
+                'message' => 'Clique no botão abaixo para acompanhar seu pedido no site da transportadora.',
+                'tracking_url' => 'https://parcelsapp.com/pt/tracking/' . urlencode($tracking_code),
+                'tracking_code' => $tracking_code,
+                'data' => [] // Array vazio para não mostrar mensagens fictícias
+            );
+        }
+
         global $wcte_order_note_date;
         $wcte_order_note_date = $order_note_date;
     
@@ -649,6 +665,16 @@ public static function get_fictitious_messages_by_order_date($order_date) {
             'status' => 'cainiao',
             'tracking_url' => $tracking_url,
             'message' => 'Clique no botão abaixo para acompanhar seu pedido no site da transportadora.'
+        );
+    }
+
+    private static function is_cainiao_tracking($tracking_code) {
+        return (
+            preg_match('/^LP\d{12,}/', $tracking_code) ||
+            preg_match('/^CNBR\d{8,}/', $tracking_code) ||
+            preg_match('/^YT\d{16}/', $tracking_code) ||
+            preg_match('/^SYRM\d{9,}/', $tracking_code) ||
+            preg_match('/^SY\d{9}BR$/', $tracking_code)
         );
     }
 }
