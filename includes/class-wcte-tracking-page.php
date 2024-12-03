@@ -247,7 +247,7 @@ class WCTE_Tracking_Page {
             ));
     
             foreach ($order_notes as $note) {
-                if (preg_match_all('/\b([A-Z]{2}[0-9]{9,14}[A-Z]{2})\b|\b(LP\d{12,})\b|\b(CNBR\d{8,})\b|\b(YT\d{16})\b/i', $note->content, $matches)) {
+                if (preg_match_all('/\b([A-Z]{2}[0-9]{9,14}[A-Z]{2})\b|\b(LP\d{12,})\b|\b(CNBR\d{8,})\b|\b(YT\d{16})\b|\b(SYRM\d{9,})\b/i', $note->content, $matches)) {
                     foreach ($matches[0] as $code) {
                         $tracking_data[$code] = $note->date_created->date('Y-m-d H:i:s');
                     }
