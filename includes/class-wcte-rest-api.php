@@ -13,7 +13,7 @@ if (!defined('ABSPATH')) {
  * - GET /wp-json/wcte/v1/tracking/{code} - Informações de rastreamento
  * - GET /wp-json/wcte/v1/tracking/email/{email} - Pedidos por email
  */
-class WCTE_REST_API {
+class WCTE_V2_REST_API {
 
     /**
      * Construct da classe

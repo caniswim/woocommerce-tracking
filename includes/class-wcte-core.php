@@ -38,7 +38,7 @@ class WCTE_Core {
         new WCTE_Admin_Settings();
         
         // Inicializa novas classes
-        new WCTE_REST_API();
+        new WCTE_V2_REST_API();
         new WCTE_API_Settings();
         new WCTE_17Track_Settings();
         
@@ -48,9 +48,6 @@ class WCTE_Core {
         // Carrega scripts e estilos
         add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_scripts' ) );
 
-        // Adiciona menu de administração
-        add_action('admin_menu', array($this, 'admin_menu'));
-        
         // Adiciona link para a configuração no plugin
         add_filter('plugin_action_links_' . plugin_basename(WCTE_PLUGIN_FILE), array($this, 'plugin_action_links'));
         

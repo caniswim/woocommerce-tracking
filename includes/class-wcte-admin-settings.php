@@ -6,6 +6,11 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 class WCTE_Admin_Settings {
     private $logs = array();
+    
+    // Códigos das transportadoras no 17track
+    private const CORREIOS_CARRIER_CODE = 2151;
+    private const CAINIAO_CARRIER_CODE = 800;
+    private const ALIEXPRESS_CARRIER_CODE = 900;
 
     public function __construct() {
         add_action( 'admin_menu', array( $this, 'add_menu_pages' ) );
@@ -103,18 +108,15 @@ class WCTE_Admin_Settings {
         // Renomeia o primeiro item do submenu
         global $submenu;
         if (isset($submenu['wcte_settings'])) {
-            $submenu['wcte_settings'][0][0] = 'Credenciais';
+            $submenu['wcte_settings'][0][0] = 'Integrações';
         }
     }
 
     public function register_settings() {
-        // Registra as configurações dos Correios
-        register_setting( 'wcte_correios_settings', 'wcte_correios_api_key' );
-        register_setting( 'wcte_correios_settings', 'wcte_correios_username' );
-        register_setting( 'wcte_correios_settings', 'wcte_correios_password' );
-        register_setting( 'wcte_correios_settings', 'wcte_correios_cartao_postagem' );
-        register_setting( 'wcte_correios_settings', 'wcte_correios_contrato' );
-        register_setting( 'wcte_correios_settings', 'wcte_correios_token' );
+        // Registra as configurações do 17track
+        register_setting( 'wcte_correios_settings', 'wcte_17track_api_key' );
+        register_setting( 'wcte_correios_settings', 'wcte_17track_enabled' );
+        register_setting( 'wcte_correios_settings', 'wcte_17track_check_interval' );
         register_setting( 'wcte_correios_settings', 'wcte_slack_webhook_url' );
 
         // Registra as configurações do Firebase
@@ -127,10 +129,10 @@ class WCTE_Admin_Settings {
             'sanitize_callback' => array($this, 'sanitize_fictitious_messages')
         ));
 
-        // Seção dos Correios
+        // Seção do 17track
         add_settings_section(
-            'wcte_correios_section',
-            'Configurações dos Correios',
+            'wcte_17track_section',
+            'Configurações do 17track',
             null,
             'wcte_correios_settings'
         );
@@ -151,53 +153,29 @@ class WCTE_Admin_Settings {
             'wcte_correios_settings'
         );
 
-        // Campos dos Correios
+        // Campos do 17track
         add_settings_field(
-            'wcte_correios_api_key',
-            'Código de Acesso à API dos Correios',
-            array( $this, 'api_key_field_callback' ),
+            'wcte_17track_enabled',
+            'Ativar integração 17track',
+            array( $this, 'track17_enabled_field_callback' ),
             'wcte_correios_settings',
-            'wcte_correios_section'
+            'wcte_17track_section'
         );
 
         add_settings_field(
-            'wcte_correios_username',
-            'Usuário do Meu Correios',
-            array( $this, 'username_field_callback' ),
+            'wcte_17track_api_key',
+            'Chave API (Security Key) do 17track',
+            array( $this, 'track17_api_key_field_callback' ),
             'wcte_correios_settings',
-            'wcte_correios_section'
+            'wcte_17track_section'
         );
 
         add_settings_field(
-            'wcte_correios_password',
-            'Senha do Meu Correios',
-            array( $this, 'password_field_callback' ),
+            'wcte_17track_check_interval',
+            'Intervalo de verificação (horas)',
+            array( $this, 'track17_check_interval_field_callback' ),
             'wcte_correios_settings',
-            'wcte_correios_section'
-        );
-
-        add_settings_field(
-            'wcte_correios_cartao_postagem',
-            'Cartão de Postagem dos Correios',
-            array( $this, 'cartao_postagem_field_callback' ),
-            'wcte_correios_settings',
-            'wcte_correios_section'
-        );
-
-        add_settings_field(
-            'wcte_correios_contrato',
-            'Contrato dos Correios',
-            array( $this, 'contrato_field_callback' ),
-            'wcte_correios_settings',
-            'wcte_correios_section'
-        );
-
-        add_settings_field(
-            'wcte_correios_token',
-            'Token dos Correios (opcional)',
-            array( $this, 'token_field_callback' ),
-            'wcte_correios_settings',
-            'wcte_correios_section'
+            'wcte_17track_section'
         );
 
         // Campos do Firebase
@@ -295,35 +273,23 @@ class WCTE_Admin_Settings {
     }
     
 
-    // Callbacks dos campos dos Correios
-    public function api_key_field_callback() {
-        $api_key = get_option( 'wcte_correios_api_key' );
-        echo '<input type="text" name="wcte_correios_api_key" value="' . esc_attr( $api_key ) . '" class="regular-text" />';
+    // Callbacks dos campos do 17track
+    public function track17_enabled_field_callback() {
+        $enabled = get_option( 'wcte_17track_enabled', true );
+        echo '<input type="checkbox" name="wcte_17track_enabled" value="1" ' . checked($enabled, 1, false) . '>';
+        echo '<p class="description">Quando desativado, o sistema manterá apenas as mensagens fictícias.</p>';
     }
 
-    public function username_field_callback() {
-        $username = get_option( 'wcte_correios_username' );
-        echo '<input type="text" name="wcte_correios_username" value="' . esc_attr( $username ) . '" class="regular-text" />';
+    public function track17_api_key_field_callback() {
+        $api_key = get_option( 'wcte_17track_api_key' );
+        echo '<input type="text" name="wcte_17track_api_key" value="' . esc_attr( $api_key ) . '" class="regular-text" />';
+        echo '<p class="description">Chave de segurança fornecida pelo 17track. Obtenha suas credenciais em <a href="https://www.17track.net/en/api" target="_blank">https://www.17track.net/en/api</a></p>';
     }
 
-    public function password_field_callback() {
-        $password = get_option( 'wcte_correios_password' );
-        echo '<input type="password" name="wcte_correios_password" value="' . esc_attr( $password ) . '" class="regular-text" />';
-    }
-
-    public function cartao_postagem_field_callback() {
-        $cartao_postagem = get_option( 'wcte_correios_cartao_postagem' );
-        echo '<input type="text" name="wcte_correios_cartao_postagem" value="' . esc_attr( $cartao_postagem ) . '" class="regular-text" />';
-    }
-
-    public function contrato_field_callback() {
-        $contrato = get_option( 'wcte_correios_contrato' );
-        echo '<input type="text" name="wcte_correios_contrato" value="' . esc_attr( $contrato ) . '" class="regular-text" />';
-    }
-
-    public function token_field_callback() {
-        $token = get_option( 'wcte_correios_token' );
-        echo '<input type="text" name="wcte_correios_token" value="' . esc_attr( $token ) . '" class="regular-text" />';
+    public function track17_check_interval_field_callback() {
+        $check_interval = get_option( 'wcte_17track_check_interval', 12 );
+        echo '<input type="number" class="small-text" name="wcte_17track_check_interval" value="' . esc_attr( $check_interval ) . '" min="1" max="48">';
+        echo '<p class="description">Intervalo em horas para verificar atualizações de rastreamento em segundo plano. Este valor define apenas a frequência do processo automático, não afeta consultas individuais que sempre usam dados em tempo real.</p>';
     }
 
     // Callbacks dos campos do Firebase
@@ -355,6 +321,22 @@ class WCTE_Admin_Settings {
         if (!current_user_can('manage_options')) {
             return;
         }
+        
+        // Faz teste de conexão com a API 17track se solicitado
+        $test_result = null;
+        if (isset($_POST['wcte_test_17track']) && check_admin_referer('wcte_test_17track', 'wcte_test_17track_nonce')) {
+            $test_result = $this->test_17track_connection();
+        }
+        
+        // Testa consulta de rastreamento se solicitado
+        $tracking_test_result = null;
+        $tracking_code = '';
+        if (isset($_POST['wcte_test_tracking']) && check_admin_referer('wcte_test_tracking', 'wcte_test_tracking_nonce')) {
+            $tracking_code = sanitize_text_field($_POST['tracking_code']);
+            if (!empty($tracking_code)) {
+                $tracking_test_result = $this->test_tracking_query($tracking_code);
+            }
+        }
         ?>
         <div class="wrap">
             <h1>Configurações do WooCommerce Tracking Enhanced</h1>
@@ -365,6 +347,18 @@ class WCTE_Admin_Settings {
                 </div>
             <?php endif; ?>
 
+            <?php if ($test_result !== null): ?>
+                <?php if ($test_result === true): ?>
+                    <div class="notice notice-success">
+                        <p>Conexão com a API do 17track realizada com sucesso!</p>
+                    </div>
+                <?php else: ?>
+                    <div class="notice notice-error">
+                        <p>Erro ao conectar com a API do 17track: <?php echo esc_html($test_result); ?></p>
+                    </div>
+                <?php endif; ?>
+            <?php endif; ?>
+
             <form method="post" action="options.php">
                 <?php
                 settings_fields('wcte_correios_settings');
@@ -372,6 +366,61 @@ class WCTE_Admin_Settings {
                 submit_button();
                 ?>
             </form>
+
+            <div style="margin-top: 20px;">
+                <form method="post">
+                    <?php wp_nonce_field('wcte_test_17track', 'wcte_test_17track_nonce'); ?>
+                    <input type="submit" name="wcte_test_17track" class="button button-secondary" value="Testar Conexão com API do 17track">
+                </form>
+            </div>
+            
+            <div class="card" style="margin-top: 20px; padding: 15px;">
+                <h2>Teste de Consulta de Rastreamento</h2>
+                <p>Digite um código de rastreio para testar a consulta à API do 17track e ver a resposta crua:</p>
+                
+                <form method="post">
+                    <?php wp_nonce_field('wcte_test_tracking', 'wcte_test_tracking_nonce'); ?>
+                    <p>
+                        <input type="text" name="tracking_code" value="<?php echo esc_attr($tracking_code); ?>" class="regular-text" placeholder="Digite o código de rastreio">
+                        <input type="submit" name="wcte_test_tracking" class="button button-secondary" value="Testar Rastreamento">
+                    </p>
+                </form>
+                
+                <?php if ($tracking_test_result !== null): ?>
+                <div style="margin-top: 10px;">
+                    <h3>Resposta da API para o código: <?php echo esc_html($tracking_code); ?></h3>
+                    <p>
+                        <form method="post" style="display: inline;">
+                            <?php wp_nonce_field('wcte_test_tracking', 'wcte_test_tracking_nonce'); ?>
+                            <input type="hidden" name="tracking_code" value="<?php echo esc_attr($tracking_code); ?>">
+                            <input type="submit" name="wcte_test_tracking" class="button button-secondary" value="Recarregar Resultado">
+                        </form>
+                        <small style="margin-left: 10px;">Esta é uma consulta em tempo real que consome 10 cotas por execução.</small>
+                    </p>
+                    <textarea readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 12px;"><?php echo esc_textarea($tracking_test_result); ?></textarea>
+                </div>
+                <?php endif; ?>
+            </div>
+
+            <div class="card" style="margin-top: 20px; padding: 15px;">
+                <h2>Sobre a integração com 17track</h2>
+                <p>O 17track é um serviço global que agrega informações de rastreamento de mais de 600 transportadoras de todo o mundo.</p>
+                <p>Benefícios da integração:</p>
+                <ul style="list-style-type: disc; margin-left: 20px;">
+                    <li>Rastreamento de múltiplas transportadoras em uma única API</li>
+                    <li>Informações mais precisas e detalhadas sobre os pacotes</li>
+                    <li>Suporte a rastreamento internacional</li>
+                    <li>Detecção automática de transportadora para muitos formatos de código</li>
+                </ul>
+                <p>Para usar a integração, você precisa:</p>
+                <ol style="list-style-type: decimal; margin-left: 20px;">
+                    <li>Registrar-se no 17track para desenvolvedores</li>
+                    <li>Obter sua credencial de API (security key)</li>
+                    <li>Configurar a chave nesta página</li>
+                </ol>
+                <p><strong>Importante:</strong> Esta integração utiliza consultas em tempo real para garantir informações sempre atualizadas. Cada consulta individual consome 10 cotas do 17track (em vez de 1 cota para consultas em cache). Certifique-se de que seu plano comporta esse volume de requisições.</p>
+                <p><strong>Nota:</strong> O plano gratuito do 17track permite um número limitado de consultas por dia. Verifique os limites na documentação oficial.</p>
+            </div>
 
             <div class="wcte-logs-viewer">
                 <h2>Logs do Sistema</h2>
@@ -507,6 +556,124 @@ class WCTE_Admin_Settings {
         <?php
     }
     
+    /**
+     * Testa a conexão com a API do 17track
+     * 
+     * @return bool|string true em caso de sucesso, mensagem de erro em caso de falha
+     */
+    private function test_17track_connection() {
+        $api_key = get_option('wcte_17track_api_key');
+        
+        if (empty($api_key)) {
+            return 'A chave de API do 17track deve ser configurada';
+        }
+        
+        // Faz requisição para verificar a quota/status da API (endpoint de quota)
+        $response = wp_remote_post('https://api.17track.net/track/v2.2/getquota', array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                '17token' => $api_key
+            ),
+            'body' => json_encode([])
+        ));
+        
+        if (is_wp_error($response)) {
+            return $response->get_error_message();
+        }
+        
+        $response_code = wp_remote_retrieve_response_code($response);
+        if ($response_code !== 200) {
+            $body = wp_remote_retrieve_body($response);
+            $data = json_decode($body, true);
+            return isset($data['data']['errors'][0]['message']) ? $data['data']['errors'][0]['message'] : 'Erro desconhecido (código ' . $response_code . ')';
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $data = json_decode($body, true);
+        
+        if (empty($data) || $data['code'] !== 0 || !isset($data['data']['quota_total'])) {
+            return 'Resposta da API não contém informações de quota';
+        }
+        
+        // Exibe mensagem de sucesso com a quota disponível
+        add_settings_error(
+            'wcte_correios_settings',
+            'wcte_17track_quota',
+            sprintf(
+                'Conexão com sucesso! Quota disponível: %d de %d. Quota diária: %d.',
+                $data['data']['quota_remain'],
+                $data['data']['quota_total'],
+                $data['data']['max_track_daily']
+            ),
+            'success'
+        );
+        
+        return true;
+    }
+
+    /**
+     * Testa uma consulta de rastreamento com a API do 17track
+     * 
+     * @param string $tracking_code Código de rastreamento a ser consultado
+     * @return string Resposta bruta da API em formato JSON formatado
+     */
+    private function test_tracking_query($tracking_code) {
+        $api_key = get_option('wcte_17track_api_key');
+        
+        if (empty($api_key)) {
+            return 'Erro: A chave de API do 17track deve ser configurada antes de testar.';
+        }
+        
+        // Prepara a requisição para obter informações de rastreamento
+        $payload = array(
+            array(
+                'number' => $tracking_code,
+                'cacheLevel' => 1
+            )
+        );
+        
+        // Define a transportadora - sempre usa Correios, exceto para Cainiao
+        $carrier_name = 'Correios Brasil';
+        $carrier_code = self::CORREIOS_CARRIER_CODE;
+        
+        // Apenas verifica se é Cainiao para fins de redirecionamento
+        if (preg_match('/^LP\d{12,}$/', $tracking_code) || 
+            preg_match('/^CNBR\d{8,}$/', $tracking_code) || 
+            preg_match('/^YT\d{16}$/', $tracking_code)) {
+            // Cainiao - exibir apenas para informação, mas não usar no payload
+            $carrier_name = 'Cainiao (redirecionado)';
+            $carrier_code = self::CAINIAO_CARRIER_CODE;
+        }
+        
+        // Adiciona sempre o código dos Correios
+        $payload[0]['carrier'] = self::CORREIOS_CARRIER_CODE;
+        
+        // Faz requisição à API do 17track
+        $response = wp_remote_post('https://api.17track.net/track/v2.2/gettrackinfo', array(
+            'headers' => array(
+                'Content-Type' => 'application/json',
+                '17token' => $api_key
+            ),
+            'body' => json_encode($payload),
+            'timeout' => 30
+        ));
+        
+        if (is_wp_error($response)) {
+            return 'Erro: ' . $response->get_error_message();
+        }
+        
+        $body = wp_remote_retrieve_body($response);
+        $json_data = json_decode($body, true);
+        
+        // Adiciona informações do carrier detectado
+        $carrier_info = "\n\n--- Informações de Detecção ---\n";
+        $carrier_info .= "Transportadora detectada: {$carrier_name} (código: {$carrier_code})\n";
+        $carrier_info .= "Transportadora utilizada na consulta: Correios Brasil (código: " . self::CORREIOS_CARRIER_CODE . ")\n";
+        $carrier_info .= "Tipo de consulta: Tempo real (cacheLevel=1)\n";
+        
+        // Formata o JSON para melhor visualização
+        return json_encode($json_data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . $carrier_info;
+    }
 }
 
 // Inicializa a classe de configurações

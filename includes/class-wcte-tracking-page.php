@@ -14,9 +14,7 @@ class WCTE_Tracking_Page {
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
         
         // Inicializa o banco de dados se necessário
-        if (!WCTE_Database::$firebase_config) {
-            WCTE_Database::init();
-        }
+        WCTE_Database::get_firebase_config();
     }
 
     public function enqueue_scripts() {

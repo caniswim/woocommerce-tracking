@@ -15,6 +15,14 @@ class WCTE_17Track_API {
     // URL base da API do 17track
     private const API_BASE_URL = 'https://api.17track.net/track/v2.2';
     
+    // Códigos das transportadoras no 17track
+    private const CARRIER_AUTO_DETECT = 0;
+    private const CARRIER_CORREIOS_BRASIL = 2151;
+    private const CARRIER_DHL = 13;
+    private const CARRIER_CHINA_POST = 3;
+    private const CARRIER_CAINIAO = 800;
+    private const CARRIER_ALIEXPRESS = 900;
+    
     /**
      * Log helper
      */
@@ -186,7 +194,9 @@ class WCTE_17Track_API {
         // Prepara a requisição para obter informações de rastreamento
         $payload = array(
             array(
-                'number' => $tracking_code
+                'number' => $tracking_code,
+                // Adiciona o parâmetro cacheLevel=1 para obter dados em tempo real
+                'cacheLevel' => 1
             )
         );
         
@@ -195,13 +205,14 @@ class WCTE_17Track_API {
             $payload[0]['carrier'] = $carrier;
         }
         
-        // Faz requisição à API do 17track para obter informações de rastreamento
+        // Faz requisição à API do 17track para obter informações de rastreamento em tempo real
         $response = wp_remote_post(self::API_BASE_URL . '/gettrackinfo', array(
             'headers' => array(
                 'Content-Type' => 'application/json',
                 '17token' => $api_key
             ),
-            'body' => json_encode($payload)
+            'body' => json_encode($payload),
+            'timeout' => 30 // Aumenta o timeout para 30 segundos já que consultas em tempo real podem demorar mais
         ));
         
         if (is_wp_error($response)) {
@@ -351,41 +362,13 @@ class WCTE_17Track_API {
      * @return int Código da transportadora no 17track
      */
     private static function detect_carrier($tracking_code) {
-        // Códigos de transportadoras do 17track:
-        // 0 - Auto-detectar
-        // 7 - Correios Brasil
-        // 13 - DHL
-        // 3 - China Post
-        // 800 - Cainiao
-        // 900 - AliExpress
-        
-        // Padrão Correios Brasil (2 letras + 9 dígitos + 2 letras)
-        if (preg_match('/^[A-Z]{2}[0-9]{9}[A-Z]{2}$/i', $tracking_code)) {
-            return 7;
-        }
-        
-        // Padrão DHL (10 dígitos ou 39 caracteres alfanuméricos)
-        if (preg_match('/^[0-9]{10}$/', $tracking_code) || preg_match('/^[A-Z0-9]{39}$/i', $tracking_code)) {
-            return 13;
-        }
-        
-        // Padrão China Post/ePacket (2 letras + 9 dígitos + 2 letras - específico para China Post)
-        if (preg_match('/^(L[A-Z][0-9]{9}[A-Z]{2})$/i', $tracking_code)) {
-            return 3;
-        }
-        
-        // Padrão Cainiao
+        // Padrão Cainiao - mantém o comportamento especial de redirecionamento
         if (self::is_cainiao_tracking($tracking_code)) {
-            return 800;
+            return self::CARRIER_CAINIAO;
         }
         
-        // AliExpress
-        if (strpos($tracking_code, 'SYRM') === 0) {
-            return 900;
-        }
-        
-        // Não conseguiu identificar, tenta auto-detecção
-        return 0;
+        // Para todos os outros códigos, usa sempre Correios Brasil
+        return self::CARRIER_CORREIOS_BRASIL;
     }
 
     /**
@@ -815,7 +798,8 @@ class WCTE_17Track_API {
             
             $payload[] = array(
                 'number' => $code,
-                'carrier' => self::detect_carrier($code)
+                'carrier' => self::detect_carrier($code),
+                'cacheLevel' => 1 // Usar sempre consulta em tempo real
             );
         }
         
@@ -829,7 +813,8 @@ class WCTE_17Track_API {
                 'Content-Type' => 'application/json',
                 '17token' => $api_key
             ),
-            'body' => json_encode($payload)
+            'body' => json_encode($payload),
+            'timeout' => 45 // Aumenta o timeout para 45 segundos já que é um lote de consultas em tempo real
         ));
         
         if (is_wp_error($response)) {

@@ -18,6 +18,18 @@ class WCTE_Database {
         self::log('Firebase config initialized', self::$firebase_config);
     }
 
+    /**
+     * Obtém a configuração do Firebase
+     * 
+     * @return array|null A configuração do Firebase ou null se não inicializada
+     */
+    public static function get_firebase_config() {
+        if (!self::$firebase_config) {
+            self::init();
+        }
+        return self::$firebase_config;
+    }
+
     private static function log($message, $data = null) {
         if (defined('WP_DEBUG') && WP_DEBUG === true) {
             $log_message = 'WCTE Database: ' . $message;
