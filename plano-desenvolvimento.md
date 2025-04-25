@@ -18,27 +18,36 @@ Este documento apresenta o plano de desenvolvimento para implementar um sistema 
 ### Fase 1: Adaptação do Plugin WooCommerce (4 semanas)
 
 #### Semana 1: Análise e Planejamento
-- [ ] Auditoria completa do código atual do plugin WooCommerce
-- [ ] Identificação dos pontos de integração
-- [ ] Definição da estrutura da API REST
-- [ ] Documentação dos requisitos de segurança
+- [x] Auditoria completa do código atual do plugin WooCommerce
+- [x] Identificação dos pontos de integração
+- [x] Definição da estrutura da API REST
+- [x] Documentação dos requisitos de segurança
+- [x] Análise da integração atual com Correios e Firebase
 
 #### Semana 2: Implementação da API REST
-- [ ] Criação de endpoints REST para consulta de pedidos
-- [ ] Implementação do sistema de autenticação via API Keys
-- [ ] Desenvolvimento da camada de validação de requisições
-- [ ] Configuração de rate limiting e proteção contra abusos
+- [x] Adaptação do sistema atual para expor os dados via endpoints REST
+- [x] Implementação de endpoints REST para consulta de pedidos:
+  - `GET /wp-json/wcte/v1/orders` - Lista pedidos com filtros
+  - `GET /wp-json/wcte/v1/orders/{id}` - Detalhes de um pedido específico 
+  - `GET /wp-json/wcte/v1/tracking/{code}` - Informações de rastreamento (adaptar método `get_tracking_info_by_code`) 
+  - `GET /wp-json/wcte/v1/tracking/email/{email}` - Pedidos por email (adaptar método existente)
+- [x] Implementação do sistema de autenticação via API Keys
+- [x] Desenvolvimento da camada de validação de requisições
+- [x] Configuração de rate limiting e proteção contra abusos
 
 #### Semana 3: Migração para 17track
-- [ ] Remoção da integração com API dos Correios
-- [ ] Implementação da integração com API do 17track
-- [ ] Desenvolvimento de sistema de cache para requisições
-- [ ] Ajustes no formato de resposta para manter compatibilidade
+- [x] Remoção da integração com API dos Correios (`class-wcte-api-handler.php`)
+- [x] Implementação da integração com API do 17track (preservando a lógica de mensagens fictícias)
+- [x] Adaptação do sistema de mensagens fictícias para compatibilidade com 17track
+- [x] Manutenção da estrutura existente de dados no Firebase
+- [x] Implementação de sistema de cache para requisições
+- [x] Adaptação do método `get_tracking_info` e `get_tracking_info_by_code` para usar 17track
 
 #### Semana 4: Testes e Otimização
 - [ ] Testes de carga nos novos endpoints
-- [ ] Otimização de consultas ao banco de dados
-- [ ] Documentação completa da API para desenvolvedores externos
+- [ ] Testes de compatibilidade com a implementação atual de Firebase
+- [ ] Otimização de consultas ao banco de dados e chamadas à API
+- [x] Documentação completa da API para desenvolvedores externos
 - [ ] Criação de ambiente de homologação
 
 ### Fase 2: Desenvolvimento do Servidor Backend (6 semanas)
@@ -46,20 +55,25 @@ Este documento apresenta o plano de desenvolvimento para implementar um sistema 
 #### Semana 1-2: Infraestrutura Base
 - [ ] Configuração do ambiente de servidor (Node.js/Express)
 - [ ] Implementação do sistema de autenticação 
-- [ ] Configuração do Firebase Realtime Database
+- [ ] Conexão com o Firebase Realtime Database existente (`https://rastreios-blazee-default-rtdb.firebaseio.com`)
+- [ ] Preservação da estrutura atual de dados conforme implementado em `class-wcte-database.php`
 - [ ] Desenvolvimento da camada de cache
+- [ ] Adaptação da integração atual com Slack para o novo servidor
 
 #### Semana 3-4: Integração com WooCommerce e Shopify
-- [ ] Desenvolvimento de conectores para a API do WooCommerce
+- [ ] Desenvolvimento de conectores para a nova API REST do WooCommerce
 - [ ] Implementação da integração com a API do Shopify
 - [ ] Criação de rotinas de sincronização de dados
 - [ ] Desenvolvimento da lógica de unificação de pedidos
+- [x] Implementação de sistema para detectar códigos de rastreio usando expressões regulares (similar ao existente em `get_tracking_codes_from_order`)
 
 #### Semana 5-6: Integração com 17track e Otimização
-- [ ] Implementação da integração direta com API do 17track
-- [ ] Desenvolvimento de sistema de filas para processamento assíncrono
+- [x] Implementação da integração direta com API do 17track
+- [x] Adaptação do sistema de mensagens fictícias (`get_fictitious_message`) para o servidor central
+- [x] Desenvolvimento de sistema de filas para processamento assíncrono
 - [ ] Configuração de métricas e monitoramento
 - [ ] Testes de carga e otimizações finais
+- [x] Implementação de sistema para lidar com diferentes formatos de código de rastreio (similar ao `is_cainiao_tracking`)
 
 ### Fase 3: Desenvolvimento do App Shopify (4 semanas)
 
@@ -70,8 +84,10 @@ Este documento apresenta o plano de desenvolvimento para implementar um sistema 
 - [ ] Configuração da integração com o servidor backend
 
 #### Semana 2-3: Interface e Funcionalidades
-- [ ] Desenvolvimento da interface de rastreamento
+- [ ] Desenvolvimento da interface de rastreamento similar à página atual (`class-wcte-tracking-page.php`)
 - [ ] Implementação da visualização de pedidos unificados
+- [ ] Recriação da lógica de exibição de mensagens fictícias e reais combinadas
+- [ ] Implementação da funcionalidade de busca por email, código de rastreio ou número de pedido
 - [ ] Criação de filtros e opções de pesquisa
 - [ ] Desenvolvimento de sistema de notificações
 
@@ -84,10 +100,11 @@ Este documento apresenta o plano de desenvolvimento para implementar um sistema 
 ### Fase 4: Implantação e Monitoramento (2 semanas)
 
 #### Semana 1: Implantação
-- [ ] Migração dos dados históricos
+- [ ] Migração dos dados históricos do Firebase atual
 - [ ] Configuração de ambientes de produção
 - [ ] Implantação em paralelo com sistema existente
 - [ ] Testes finais de integração
+- [ ] Verificação da compatibilidade com mensagens fictícias existentes
 
 #### Semana 2: Estabilização
 - [ ] Monitoramento intensivo do sistema
@@ -113,17 +130,20 @@ Será implementada autenticação via API Keys com HMAC para assinatura de requi
 #### Tecnologias:
 - **Linguagem**: Node.js com TypeScript
 - **Framework**: Express.js
-- **Banco de Dados**: Firebase Realtime Database
+- **Banco de Dados**: Firebase Realtime Database (manter a estrutura existente)
 - **Cache**: Redis
 - **Filas**: Bull
 - **Monitoramento**: Prometheus + Grafana
+- **Integração de Notificações**: Slack (preservando a funcionalidade atual)
 
 #### Serviços:
 - API Gateway
-- Serviço de Rastreamento
+- Serviço de Rastreamento (migração da lógica atual para 17track)
 - Serviço de Sincronização
 - Gerenciador de Cache
+- Sistema de Mensagens Fictícias (adaptado do sistema atual)
 - Processador de Filas
+- Conectores para WooCommerce e Shopify
 
 ### App Shopify
 
@@ -135,10 +155,12 @@ Será implementada autenticação via API Keys com HMAC para assinatura de requi
 - **API Client**: GraphQL e REST
 
 #### Funcionalidades:
-- Página de rastreamento personalizada
+- Página de rastreamento personalizada (similar à atual no WooCommerce)
 - Embeddable App para painel administrativo
 - Webhooks para sincronização em tempo real
 - Notificações para clientes
+- Suporte a mensagens fictícias para pedidos sem rastreio
+- Interface para gerenciar mensagens fictícias (similar à atual)
 
 ## Requisitos de Infraestrutura
 
@@ -189,13 +211,25 @@ Será implementada autenticação via API Keys com HMAC para assinatura de requi
 ## Estratégia de Migração
 A migração será realizada em fases, mantendo o sistema atual operacional:
 
-1. Implantação da API no WooCommerce sem interromper operações
-2. Implantação do servidor backend em paralelo
-3. Período de operação conjunta para validação
-4. Migração gradual dos clientes para o novo sistema
+1. Implantação da API REST no WooCommerce sem interromper o funcionamento atual do plugin
+2. Validação do funcionamento da API em paralelo com o sistema atual
+3. Implantação do servidor backend mantendo compatibilidade com a estrutura de dados do Firebase
+4. Período de operação conjunta para validação
+5. Migração gradual dos clientes para o novo sistema, preservando os dados históricos
 
-## Próximos Passos Imediatos
-1. Aprovação do plano de desenvolvimento
-2. Configuração dos ambientes de desenvolvimento
-3. Implementação da API REST no plugin WooCommerce
-4. Início do desenvolvimento do servidor backend 
+## Progresso Atual
+
+### Fase 1 (Adaptação do Plugin WooCommerce)
+- Implementada a API REST com todos os endpoints previstos
+- Desenvolvido sistema de autenticação por API Keys com controle de rate limiting
+- Migração da integração dos Correios para 17track concluída
+- Sistema de mensagens fictícias adaptado para funcionar com o 17track
+- Implementado sistema de cache para reduzir chamadas à API do 17track
+- Implementado sistema de processamento em lote via cron para atualização de rastreamentos
+- Adicionada página de configuração da API REST
+- Adicionada página de configuração da integração com 17track
+
+## Próximos Passos
+1. Concluir testes de carga e otimizações
+2. Criar ambiente de homologação
+3. Iniciar desenvolvimento do servidor backend (Fase 2) 

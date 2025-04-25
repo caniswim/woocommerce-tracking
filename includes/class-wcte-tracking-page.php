@@ -12,12 +12,10 @@ class WCTE_Tracking_Page {
         add_action('wp_ajax_wcte_track_order', array($this, 'handle_track_order'));
         add_action('wp_ajax_nopriv_wcte_track_order', array($this, 'handle_track_order'));
         add_action('wp_enqueue_scripts', array($this, 'enqueue_scripts'));
-
-        try {
-            $this->api_handler = new WCTE_API_Handler();
-            error_log('WCTE - API Handler inicializado com sucesso');
-        } catch (Exception $e) {
-            error_log('WCTE - Erro ao inicializar API Handler: ' . $e->getMessage());
+        
+        // Inicializa o banco de dados se necessário
+        if (!WCTE_Database::$firebase_config) {
+            WCTE_Database::init();
         }
     }
 
@@ -58,12 +56,6 @@ class WCTE_Tracking_Page {
     public function handle_track_order() {
         try {
             error_log('WCTE - Iniciando processamento de rastreamento');
-    
-            if (!$this->api_handler) {
-                error_log('WCTE - API Handler não inicializado');
-                wp_send_json_error('Erro interno: API Handler não inicializado');
-                return;
-            }
     
             if (!isset($_POST['tracking_input'])) {
                 error_log('WCTE - Parâmetro de tracking ausente');
@@ -125,7 +117,9 @@ class WCTE_Tracking_Page {
                         // Processa os códigos de rastreamento
                         foreach ($tracking_data as $code => $note_date) {
                             error_log('WCTE - Consultando código: ' . $code . ' com data da nota: ' . $note_date);
-                            $tracking_info = WCTE_API_Handler::get_tracking_info_by_code($code, $note_date);
+                            
+                            // Usa a nova API do 17track em vez da classe original
+                            $tracking_info = WCTE_17Track_API::get_tracking_info_by_code($code, $note_date);
     
                             if ($tracking_info) {
                                 error_log('WCTE - Informações obtidas para ' . $code . ': ' . print_r($tracking_info, true));
@@ -171,7 +165,9 @@ class WCTE_Tracking_Page {
                             default:
                                 // Gera mensagens fictícias para pedidos processando ou concluídos sem rastreio
                                 $order_date = $order->get_date_created()->date('Y-m-d H:i:s');
-                                $fictitious_messages = WCTE_API_Handler::get_fictitious_messages_by_order_date($order_date);
+                                
+                                // Usa a nova API do 17track para obter mensagens fictícias
+                                $fictitious_messages = WCTE_17Track_API::get_fictitious_messages_by_order_date($order_date);
     
                                 if ($fictitious_messages) {
                                     $tracking_result = array(
@@ -201,7 +197,8 @@ class WCTE_Tracking_Page {
             } else {
                 $tracking_data = array($tracking_input => date('Y-m-d H:i:s'));
                 foreach ($tracking_data as $code => $note_date) {
-                    $tracking_info = WCTE_API_Handler::get_tracking_info_by_code($code, $note_date);
+                    // Usa a nova API do 17track em vez da classe original
+                    $tracking_info = WCTE_17Track_API::get_tracking_info_by_code($code, $note_date);
     
                     if ($tracking_info) {
                         $tracking_info['tracking_code'] = $code;
