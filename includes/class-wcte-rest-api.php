@@ -77,6 +77,21 @@ class WCTE_V2_REST_API {
                 ),
             ),
         ));
+        
+        // Registra a rota unificada para processar diferentes tipos de entrada (como o AJAX)
+        register_rest_route($namespace, '/track', array(
+            'methods'  => 'GET',
+            'callback' => array($this, 'track_order'),
+            'permission_callback' => array($this, 'check_permission'),
+            'args' => array(
+                'tracking_input' => array(
+                    'required' => true,
+                    'validate_callback' => function($param) {
+                        return !empty($param);
+                    }
+                ),
+            ),
+        ));
     }
 
     /**
@@ -316,7 +331,168 @@ class WCTE_V2_REST_API {
     }
 
     /**
-     * Obtém os itens de um pedido
+     * Processa diferentes tipos de entrada para rastreamento (similar ao AJAX)
+     * 
+     * @param WP_REST_Request $request Objeto da requisição
+     * @return WP_REST_Response
+     */
+    public function track_order($request) {
+        $tracking_input = sanitize_text_field($request->get_param('tracking_input'));
+        $tracking_input = trim($tracking_input, '#');
+        
+        $response = array();
+        $results = array();
+        
+        // Verifica se é um email
+        if (is_email($tracking_input)) {
+            $orders = wc_get_orders(array(
+                'billing_email' => $tracking_input,
+                'limit' => -1,
+            ));
+            
+            if (!empty($orders)) {
+                // Prepara os dados dos pedidos para exibição
+                $order_list = array();
+                foreach ($orders as $order) {
+                    $tracking_code = $order->get_meta('_tracking_code');
+                    $order_list[] = array(
+                        'order_id' => $order->get_id(),
+                        'order_date' => $order->get_date_created()->date('d/m/Y H:i'),
+                        'order_status' => wc_get_order_status_name($order->get_status()),
+                        'tracking_code' => $tracking_code ? $tracking_code : '',
+                    );
+                }
+                $response['status'] = 'orders_found';
+                $response['message'] = 'Pedidos encontrados para o email.';
+                $response['data'] = $order_list;
+                
+                return $this->rest_success_response($response);
+            } else {
+                return $this->rest_error_response('Nenhum pedido encontrado para este email.');
+            }
+        } 
+        // Verifica se é um número de pedido
+        elseif (is_numeric($tracking_input)) {
+            $order_id = intval($tracking_input);
+            $order = wc_get_order($order_id);
+            
+            if ($order) {
+                $order_status = $order->get_status();
+                $tracking_data = $this->extract_tracking_codes($order);
+                
+                if (!empty($tracking_data)) {
+                    // Processa os códigos de rastreamento
+                    foreach ($tracking_data as $code => $note_date) {
+                        $tracking_info = WCTE_17Track_API::get_tracking_info_by_code($code, $note_date);
+                        
+                        if ($tracking_info) {
+                            $tracking_info['tracking_code'] = $code;
+                            $results[] = $tracking_info;
+                        }
+                    }
+                    
+                    // Inclui informações adicionais do pedido
+                    $response['order_number'] = $order->get_order_number();
+                    $response['order_items'] = $this->get_order_items($order);
+                    $response['tracking_results'] = $results;
+                    
+                    return $this->rest_success_response($response);
+                } else {
+                    // Trata diferentes status do pedido
+                    switch ($order_status) {
+                        case 'pending':
+                            return $this->rest_error_response('Seu pedido está pendente de pagamento.');
+                        case 'failed':
+                            return $this->rest_error_response('O pagamento do seu pedido falhou. Por favor, tente novamente.');
+                        case 'cancelled':
+                            return $this->rest_error_response('Este pedido foi cancelado.');
+                        case 'refunded':
+                            return $this->rest_error_response('Este pedido foi reembolsado.');
+                        case 'on-hold':
+                            return $this->rest_error_response('Seu pedido está aguardando confirmação.');
+                        case 'processing':
+                        case 'completed':
+                        default:
+                            // Gera mensagens fictícias para pedidos processando ou concluídos sem rastreio
+                            $order_date = $order->get_date_created()->date('Y-m-d H:i:s');
+                            
+                            // Usa a API do 17track para obter mensagens fictícias
+                            $fictitious_messages = WCTE_17Track_API::get_fictitious_messages_by_order_date($order_date);
+                            
+                            if ($fictitious_messages) {
+                                $tracking_result = array(
+                                    'status' => 'in_transit',
+                                    'message' => end($fictitious_messages)['description'],
+                                    'data' => $fictitious_messages,
+                                );
+                                
+                                $response['order_number'] = $order->get_order_number();
+                                $response['order_items'] = $this->get_order_items($order);
+                                $response['tracking_results'] = array($tracking_result);
+                                
+                                return $this->rest_success_response($response);
+                            } else {
+                                return $this->rest_error_response('Não há informações de rastreamento disponíveis para este pedido.');
+                            }
+                    }
+                }
+            } else {
+                return $this->rest_error_response('Pedido não encontrado.');
+            }
+        } 
+        // Trata o caso de rastreamento direto (código de rastreio)
+        else {
+            $tracking_data = array($tracking_input => date('Y-m-d H:i:s'));
+            foreach ($tracking_data as $code => $note_date) {
+                $tracking_info = WCTE_17Track_API::get_tracking_info_by_code($code, $note_date);
+                
+                if ($tracking_info) {
+                    $tracking_info['tracking_code'] = $code;
+                    $results[] = $tracking_info;
+                } else {
+                    return $this->rest_error_response('Erro ao buscar informações para o código: ' . $code);
+                }
+            }
+            
+            if (!empty($results)) {
+                $response['tracking_results'] = $results;
+                return $this->rest_success_response($response);
+            } else {
+                return $this->rest_error_response('Nenhuma informação de rastreamento encontrada.');
+            }
+        }
+    }
+
+    /**
+     * Retorna uma resposta de sucesso no mesmo formato do AJAX
+     * 
+     * @param array $data Dados da resposta
+     * @return WP_REST_Response
+     */
+    private function rest_success_response($data) {
+        $response = array(
+            'success' => true,
+            'data' => $data
+        );
+        return new WP_REST_Response($response, 200);
+    }
+    
+    /**
+     * Retorna uma resposta de erro no mesmo formato do AJAX
+     * 
+     * @param string $message Mensagem de erro
+     * @return WP_REST_Response
+     */
+    private function rest_error_response($message) {
+        $response = array(
+            'success' => false,
+            'data' => $message
+        );
+        return new WP_REST_Response($response, 200); // Retorna 200 mesmo em erro para manter compatibilidade com AJAX
+    }
+
+    /**
+     * Obtém os itens de um pedido com imagens
      * 
      * @param WC_Order $order Objeto do pedido
      * @return array Itens do pedido formatados
@@ -327,12 +503,11 @@ class WCTE_V2_REST_API {
         foreach ($order->get_items() as $item) {
             $product = $item->get_product();
             if ($product) {
+                $image_url = wp_get_attachment_image_url($product->get_image_id(), 'thumbnail');
                 $items[] = array(
-                    'id' => $product->get_id(),
+                    'product_id' => $product->get_id(),
                     'name' => $product->get_name(),
-                    'quantity' => $item->get_quantity(),
-                    'price' => $item->get_total(),
-                    'sku' => $product->get_sku(),
+                    'image' => $image_url,
                 );
             }
         }
