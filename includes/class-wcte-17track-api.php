@@ -10,6 +10,13 @@ if (!defined('ABSPATH')) {
  * Esta classe substitui a integração com a API dos Correios no plugin original.
  * Mantém a compatibilidade com o sistema de mensagens fictícias e a estrutura
  * existente de dados no Firebase.
+ * 
+ * Recursos:
+ * - Integração com API do 17track para rastreamento em tempo real
+ * - Suporte a mensagens fictícias para pedidos novos
+ * - Capacidade de ignorar eventos específicos de rastreamento
+ * - Detecção automática de transportadora
+ * - Cache local de códigos já registrados
  */
 class WCTE_17Track_API {
     // URL base da API do 17track
@@ -256,6 +263,11 @@ class WCTE_17Track_API {
         if (isset($tracking_data['track_info']['tracking']['providers']) && 
             is_array($tracking_data['track_info']['tracking']['providers'])) {
             
+            // Obtém a lista de eventos a serem ignorados
+            $ignored_events = get_option('wcte_17track_ignored_events', '');
+            $ignored_events_array = !empty($ignored_events) ? explode("\n", $ignored_events) : array();
+            $ignored_events_array = array_map('trim', $ignored_events_array);
+            
             // Processa eventos de rastreamento
             $providers = $tracking_data['track_info']['tracking']['providers'];
             
@@ -286,9 +298,25 @@ class WCTE_17Track_API {
                         // Formata a data
                         $event_date = date('d/m/Y H:i', $time);
                         
+                        // Verifica se o evento deve ser ignorado
+                        $description = $event['description'] ?? 'Sem descrição';
+                        if (!empty($ignored_events_array)) {
+                            $should_ignore = false;
+                            foreach ($ignored_events_array as $ignored_event) {
+                                if (!empty($ignored_event) && stripos($description, $ignored_event) !== false) {
+                                    $should_ignore = true;
+                                    break;
+                                }
+                            }
+                            
+                            if ($should_ignore) {
+                                continue; // Pula este evento
+                            }
+                        }
+                        
                         $events[] = array(
                             'date' => $event_date,
-                            'description' => $event['description'] ?? 'Sem descrição',
+                            'description' => $description,
                             'location' => $event['location'] ?? 'Desconhecido'
                         );
                     }

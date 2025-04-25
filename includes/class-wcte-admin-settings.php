@@ -117,6 +117,7 @@ class WCTE_Admin_Settings {
         register_setting( 'wcte_correios_settings', 'wcte_17track_api_key' );
         register_setting( 'wcte_correios_settings', 'wcte_17track_enabled' );
         register_setting( 'wcte_correios_settings', 'wcte_17track_check_interval' );
+        register_setting( 'wcte_correios_settings', 'wcte_17track_ignored_events' );
         register_setting( 'wcte_correios_settings', 'wcte_slack_webhook_url' );
 
         // Registra as configurações do Firebase
@@ -174,6 +175,14 @@ class WCTE_Admin_Settings {
             'wcte_17track_check_interval',
             'Intervalo de verificação (horas)',
             array( $this, 'track17_check_interval_field_callback' ),
+            'wcte_correios_settings',
+            'wcte_17track_section'
+        );
+
+        add_settings_field(
+            'wcte_17track_ignored_events',
+            'Eventos a serem ignorados',
+            array( $this, 'track17_ignored_events_field_callback' ),
             'wcte_correios_settings',
             'wcte_17track_section'
         );
@@ -290,6 +299,12 @@ class WCTE_Admin_Settings {
         $check_interval = get_option( 'wcte_17track_check_interval', 12 );
         echo '<input type="number" class="small-text" name="wcte_17track_check_interval" value="' . esc_attr( $check_interval ) . '" min="1" max="48">';
         echo '<p class="description">Intervalo em horas para verificar atualizações de rastreamento em segundo plano. Este valor define apenas a frequência do processo automático, não afeta consultas individuais que sempre usam dados em tempo real.</p>';
+    }
+
+    public function track17_ignored_events_field_callback() {
+        $ignored_events = get_option( 'wcte_17track_ignored_events', '' );
+        echo '<textarea name="wcte_17track_ignored_events" rows="5" cols="50" class="large-text">' . esc_textarea( $ignored_events ) . '</textarea>';
+        echo '<p class="description">Especifique eventos que devem ser ignorados nas atualizações de rastreamento (um por linha). Qualquer evento contendo estes textos não será mostrado aos clientes. Exemplo: "Objeto postado", "Objeto em trânsito".</p>';
     }
 
     // Callbacks dos campos do Firebase
